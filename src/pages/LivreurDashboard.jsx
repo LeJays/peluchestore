@@ -1,22 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebase/config';
-import { collection, onSnapshot, query, where, doc, updateDoc, serverTimestamp, getDoc, getDocs } from "firebase/firestore";
-import { onAuthStateChanged, signOut } from "firebase/auth";
 import { 
-  Truck, Phone, MapPin, Package, CheckCircle, XCircle, 
-  LogOut, Clock, CheckCheck, Edit3, Trash2, Smartphone, User, Save, ChevronDown
+  collection, onSnapshot, query, where, doc, updateDoc, 
+  serverTimestamp, getDoc, deleteDoc 
+} from "firebase/firestore";
+import { onAuthStateChanged, signOut } from "firebase/auth"; // Import de signOut
+import { 
+  Truck, Phone, MapPin, Package, CheckCircle, 
+  LogOut, Clock, CheckCheck, Trash2, Smartphone, User 
 } from 'lucide-react';
 
 export default function LivreurDashboard() {
   const [activeTab, setActiveTab] = useState('attente'); 
   const [missions, setMissions] = useState([]);
-  const [stockPeluches, setStockPeluches] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState({ name: "", uid: "" });
   const [showPaymentModal, setShowPaymentModal] = useState(null); 
-  const [editMode, setEditMode] = useState(null); 
 
-  // 1. Profil du livreur connecté
+  // 1. Profil et Gestion de la session
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -29,24 +30,15 @@ export default function LivreurDashboard() {
         } catch (error) {
           setUserProfile({ name: user.email.split('@')[0], uid: user.uid });
         }
+      } else {
+        // Optionnel: Redirection vers login si nécessaire ici
+        // window.location.href = "/login"; 
       }
     });
     return () => unsubAuth();
   }, []);
 
-  // 2. Charger les peluches pour les menus et le calcul
-  useEffect(() => {
-    const fetchPeluches = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "peluches"));
-        const p = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setStockPeluches(p);
-      } catch (e) { console.error("Erreur chargement stock"); }
-    };
-    fetchPeluches();
-  }, []);
-
-  // 3. Écoute des commandes avec filtrage livreur_final pour "Terminé"
+  // 2. Écoute des commandes
   useEffect(() => {
     setLoading(true);
     let statuts = (activeTab === 'attente') ? ["EN_ATTENTE"] : (activeTab === 'cours') ? ["EN_COURS"] : ["LIVRÉ"];
@@ -55,7 +47,7 @@ export default function LivreurDashboard() {
     const unsubscribe = onSnapshot(q, (snap) => {
       let docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       if (activeTab === 'termine') {
-        docs = docs.filter(m => m.livreur_final === m.livreur_nom && m.livreur_final === userProfile.name);
+        docs = docs.filter(m => m.livreur_final === userProfile.name);
       }
       setMissions(docs);
       setLoading(false);
@@ -65,21 +57,35 @@ export default function LivreurDashboard() {
     return () => unsubscribe();
   }, [activeTab, userProfile.name]);
 
-  // --- LOGIQUE DE STOCK ---
-
-  const restaurerStock = async (nomArticle, quantite) => {
-    try {
-      const q = query(collection(db, "peluches"), where("nom", "==", nomArticle));
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const pDoc = snap.docs[0];
-        const nouveauStock = Number(pDoc.data().stock || 0) + Number(quantite);
-        await updateDoc(doc(db, "peluches", pDoc.id), { stock: nouveauStock });
+  // --- FONCTION DE DECONNEXION ---
+  const handleLogout = async () => {
+    if (window.confirm("Voulez-vous vraiment vous déconnecter ?")) {
+      try {
+        await signOut(auth);
+      } catch (error) {
+        alert("Erreur lors de la déconnexion");
       }
-    } catch (e) { console.error("Erreur stock retour:", e); }
+    }
   };
 
-  // --- ACTIONS ---
+  const handleAnnulerCommande = async (commande) => {
+    const confirmation = window.confirm(
+      `Supprimer la commande de ${commande.client} ? \nLe stock sera remis à jour (+${commande.quantite}).`
+    );
+    if (!confirmation) return;
+    try {
+      if (commande.pelucheId) {
+        const pelucheRef = doc(db, "peluches", commande.pelucheId);
+        const pelucheSnap = await getDoc(pelucheRef);
+        if (pelucheSnap.exists()) {
+          await updateDoc(pelucheRef, {
+            stock: Number(pelucheSnap.data().stock || 0) + Number(commande.quantite)
+          });
+        }
+      }
+      await deleteDoc(doc(db, "commandes", commande.id));
+    } catch (err) { alert("Erreur : " + err.message); }
+  };
 
   const modifierStatut = async (id, nouveauStatut) => {
     try {
@@ -89,17 +95,6 @@ export default function LivreurDashboard() {
         derniere_maj: serverTimestamp()
       });
     } catch (e) { alert("Erreur réseau"); }
-  };
-
-  const handleAnnulerCommande = async (commande) => {
-    if (window.confirm("Annuler et remettre la marchandise en stock ?")) {
-      await restaurerStock(commande.nomArticle, commande.quantite);
-      await updateDoc(doc(db, "commandes", commande.id), {
-        statut_livraison: "ANNULÉ",
-        derniere_maj: serverTimestamp()
-      });
-      alert("Annulé et stock mis à jour !");
-    }
   };
 
   const finaliserLivraison = async (modePaiement) => {
@@ -117,35 +112,22 @@ export default function LivreurDashboard() {
     } catch (e) { alert("Erreur validation"); }
   };
 
-  const handleUpdateOrder = async (id, newQty, newArticleName) => {
-    try {
-      const peluche = stockPeluches.find(p => p.nom === newArticleName);
-      const qty = Number(newQty);
-      const nouveauPrix = peluche ? peluche.prix_vente * qty : 0;
-
-      await updateDoc(doc(db, "commandes", id), {
-        quantite: String(qty),
-        nomArticle: newArticleName,
-        prixTotal: nouveauPrix,
-        modifie_par: userProfile.name,
-        derniere_maj: serverTimestamp()
-      });
-      setEditMode(null);
-    } catch (e) { alert("Erreur modif"); }
-  };
-
   return (
     <div className="min-h-screen bg-[#FDFCFB] font-['Inter'] pb-24">
-      
       <header className="bg-[#1A1C23] text-white p-6 rounded-b-[2.5rem] shadow-xl sticky top-0 z-40">
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-xl font-black italic tracking-tighter text-orange-500">PELUCHE STORE</h1>
+            <h1 className="text-xl font-black italic tracking-tighter text-orange-500 uppercase">Peluche Store 🇨🇲</h1>
             <p className="text-[10px] text-green-400 font-bold uppercase tracking-widest italic">Livreur : {userProfile.name}</p>
           </div>
-          <button onClick={() => signOut(auth)} className="bg-white/10 p-3 rounded-2xl text-red-400"><LogOut size={20} /></button>
+          {/* BOUTON DECONNEXION FONCTIONNEL ICI */}
+          <button 
+            onClick={handleLogout} 
+            className="bg-white/10 p-3 rounded-2xl text-red-400 active:scale-90 transition-transform"
+          >
+            <LogOut size={20} />
+          </button>
         </div>
-
         <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
           <TabBtn active={activeTab === 'attente'} onClick={() => setActiveTab('attente')} icon={<Clock size={16}/>} label="Attente" />
           <TabBtn active={activeTab === 'cours'} onClick={() => setActiveTab('cours')} icon={<Truck size={16}/>} label="En cours" />
@@ -155,7 +137,7 @@ export default function LivreurDashboard() {
 
       <main className="p-4 space-y-4">
         {loading ? (
-          <div className="text-center py-20 text-gray-400 font-bold italic animate-pulse">Chargement des missions...</div>
+          <div className="text-center py-20 text-gray-400 font-bold italic animate-pulse">Chargement...</div>
         ) : missions.length === 0 ? (
           <div className="text-center py-20 opacity-30">
             <Package size={50} className="mx-auto mb-2 text-gray-400" />
@@ -170,18 +152,9 @@ export default function LivreurDashboard() {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-black text-[#4A3228] capitalize leading-none">{m.client}</h3>
-                  {editMode === m.id ? (
-                    <div className="relative mt-2">
-                      <select id={`art-${m.id}`} defaultValue={m.nomArticle} className="appearance-none w-full bg-orange-50 border-b-2 border-orange-400 text-[11px] font-black uppercase px-2 py-2 rounded focus:outline-none">
-                        {stockPeluches.map(p => (
-                          <option key={p.id} value={p.nom}>{p.nom} ({p.taille}cm - {p.prix_vente}F)</option>
-                        ))}
-                      </select>
-                      <ChevronDown size={14} className="absolute right-2 top-2.5 text-orange-400 pointer-events-none" />
-                    </div>
-                  ) : (
-                    <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 tracking-tight">{m.nomArticle} — {m.prixTotal} F</p>
-                  )}
+                  <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 tracking-tight">
+                    {m.nomArticle} — <span className="text-orange-600">{Number(m.prixTotal).toLocaleString()} F</span>
+                  </p>
                 </div>
               </div>
 
@@ -194,11 +167,7 @@ export default function LivreurDashboard() {
                   <div className="flex items-center gap-2 text-blue-600 font-black"><Phone size={14} /> <span className="text-sm">{m.tel}</span></div>
                   <div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full text-xs font-black text-gray-600">
                     <Package size={12}/>
-                    {editMode === m.id ? (
-                      <input type="number" id={`qty-${m.id}`} defaultValue={m.quantite} className="w-10 bg-white border border-orange-300 rounded text-center outline-none" />
-                    ) : (
-                      <span>Qté: {m.quantite}</span>
-                    )}
+                    <span>Qté: {m.quantite}</span>
                   </div>
                 </div>
               </div>
@@ -212,13 +181,8 @@ export default function LivreurDashboard() {
 
                 {activeTab === 'attente' && (
                   <div className="grid grid-cols-4 gap-2">
-                    <button onClick={() => handleAnnulerCommande(m)} className="bg-red-50 text-red-500 p-4 rounded-2xl flex items-center justify-center active:scale-90"><Trash2 size={20}/></button>
-                    {editMode === m.id ? (
-                      <button onClick={() => handleUpdateOrder(m.id, document.getElementById(`qty-${m.id}`).value, document.getElementById(`art-${m.id}`).value)} className="bg-green-600 text-white p-4 rounded-2xl flex items-center justify-center shadow-lg"><Save size={20}/></button>
-                    ) : (
-                      <button onClick={() => setEditMode(m.id)} className="bg-gray-50 text-gray-400 p-4 rounded-2xl flex items-center justify-center"><Edit3 size={20}/></button>
-                    )}
-                    <button onClick={() => modifierStatut(m.id, "EN_COURS")} className="col-span-2 bg-[#4A3228] text-white font-black text-[10px] rounded-2xl uppercase tracking-widest shadow-lg">Lancer la course</button>
+                    <button onClick={() => handleAnnulerCommande(m)} className="bg-red-50 text-red-500 p-4 rounded-2xl flex items-center justify-center active:scale-90 border border-red-100"><Trash2 size={20}/></button>
+                    <button onClick={() => modifierStatut(m.id, "EN_COURS")} className="col-span-3 bg-[#4A3228] text-white font-black text-[10px] rounded-2xl uppercase tracking-widest shadow-lg">Lancer la course</button>
                   </div>
                 )}
 
@@ -244,7 +208,7 @@ export default function LivreurDashboard() {
       {showPaymentModal && (
         <div className="fixed inset-0 bg-[#1A1C23]/95 z-50 flex items-center justify-center p-6 backdrop-blur-md">
           <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 text-center shadow-2xl animate-in zoom-in-95">
-            <h2 className="text-2xl font-black text-[#4A3228] mb-8 uppercase tracking-tighter italic">Paiement</h2>
+            <h2 className="text-2xl font-black text-[#4A3228] mb-8 uppercase tracking-tighter italic border-b pb-4">Mode de Paiement</h2>
             <div className="grid grid-cols-1 gap-3">
               <PaymentBtn color="bg-[#FF6600]" label="Orange Money" onClick={() => finaliserLivraison("Orange Money")} />
               <PaymentBtn color="bg-[#FFCC00]" label="Mobile Money" onClick={() => finaliserLivraison("Mobile Money")} />

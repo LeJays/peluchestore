@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase/config';
 import { 
   collection, onSnapshot, query, where, orderBy, 
-  updateDoc, doc, limit 
+  updateDoc, doc, limit, deleteDoc, getDoc 
 } from "firebase/firestore";
+import { Trash2 } from 'lucide-react'; // Pour une icône sympa
 
 export default function Livraisons() {
   const [commandesEnAttente, setCommandesEnAttente] = useState([]);
@@ -13,13 +14,9 @@ export default function Livraisons() {
   // FONCTION POUR ÉVITER L'ERREUR {seconds, nanoseconds}
   const formatDate = (dateField) => {
     if (!dateField) return "N/A";
-    
-    // Si c'est un Timestamp Firebase
     if (dateField.seconds) {
       return new Date(dateField.seconds * 1000).toLocaleString('fr-FR');
     }
-    
-    // Si c'est déjà une String ou autre
     return String(dateField);
   };
 
@@ -49,12 +46,41 @@ export default function Livraisons() {
     return () => { unsubAttente(); unsubLivre(); };
   }, []);
 
+  // NOUVELLE FONCTION : ANNULER ET REMETTRE EN STOCK
+  const annulerCommande = async (commande) => {
+    const confirmation = window.confirm(`Voulez-vous annuler la commande de ${commande.client} ? Le stock de la peluche sera augmenté de ${commande.quantite}.`);
+    
+    if (!confirmation) return;
+
+    try {
+      // 1. Récupérer la peluche pour mettre à jour son stock
+      if (commande.pelucheId) {
+        const pelucheRef = doc(db, "peluches", commande.pelucheId);
+        const pelucheSnap = await getDoc(pelucheRef);
+
+        if (pelucheSnap.exists()) {
+          const stockActuel = Number(pelucheSnap.data().stock || 0);
+          await updateDoc(pelucheRef, {
+            stock: stockActuel + Number(commande.quantite)
+          });
+        }
+      }
+
+      // 2. Supprimer la commande
+      await deleteDoc(doc(db, "commandes", commande.id));
+      
+      alert("Commande supprimée et stock rétabli !");
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'annulation : " + err.message);
+    }
+  };
+
   const validerLivraison = async (commande) => {
     if (!window.confirm(`Confirmer la livraison de ${commande.client} ?`)) return;
     try {
       const updates = {
         statut_livraison: 'LIVRÉ',
-        // On enregistre une String pour être tranquille à l'affichage
         date_livraison_reelle: new Date().toLocaleString('fr-FR'),
         livreur_final: commande.livreur_nom || "Admin" 
       };
@@ -93,15 +119,22 @@ export default function Livraisons() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {commandesEnAttente.map((c) => (
-            <div key={c.id} className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-50">
+            <div key={c.id} className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-gray-50 flex flex-col h-full">
               <div className="flex justify-between items-start mb-4">
                 <span className="text-[9px] font-black px-3 py-1 rounded-full uppercase italic bg-orange-50 text-orange-600 border border-orange-100">
                   {c.statut_livraison}
                 </span>
-                <span className="text-[10px] text-gray-400 font-bold uppercase">{c.lieu}</span>
+                {/* BOUTON ANNULER RAPIDE */}
+                <button 
+                  onClick={() => annulerCommande(c)}
+                  className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                  title="Annuler la commande"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
               
-              <div className="mb-6">
+              <div className="mb-6 flex-grow">
                 <h4 className="text-lg font-black text-[#4A3228] uppercase leading-tight">{c.nomArticle}</h4>
                 <p className="text-[10px] font-bold text-gray-400 mt-2">DATE COMMANDE : {formatDate(c.timestamp || c.date)}</p>
               </div>
@@ -109,14 +142,17 @@ export default function Livraisons() {
               <div className="bg-gray-50 rounded-2xl p-4 mb-4 border border-gray-100">
                  <p className="text-[11px] font-black text-[#4A3228] uppercase">{c.client}</p>
                  <p className="text-[10px] font-bold text-blue-600 mt-1">{c.tel}</p>
+                 <p className="text-[9px] text-gray-400 font-bold uppercase mt-1">📍 {c.lieu}</p>
               </div>
 
-              <button 
-                onClick={() => validerLivraison(c)}
-                className="w-full bg-[#1A1C23] text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-green-600 shadow-lg active:scale-95 transition-all"
-              >
-                Confirmer Livraison
-              </button>
+              <div className="grid grid-cols-1 gap-2">
+                <button 
+                  onClick={() => validerLivraison(c)}
+                  className="w-full bg-[#1A1C23] text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-green-600 shadow-lg active:scale-95 transition-all"
+                >
+                  Confirmer Livraison
+                </button>
+              </div>
             </div>
           ))}
         </div>

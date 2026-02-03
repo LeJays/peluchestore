@@ -6,7 +6,7 @@ export default function Catalogue() {
   const [categories, setCategories] = useState([]);
   const [peluches, setPeluches] = useState([]);
   const [newCat, setNewCat] = useState("");
-  const [formPeluche, setFormPeluche] = useState({ categorie: '', prix_achat: '', prix_vente: '', taille: '', couleur: '' });
+  const [formPeluche, setFormPeluche] = useState({ categorie: '', prix_vente: '', taille: '', couleur: '' });
 
   const listeCouleurs = ["Blanc", "Marron", "Orange", "Rose", "Rouge", "Violet"].sort();
 
@@ -35,10 +35,9 @@ export default function Catalogue() {
     await addDoc(collection(db, "peluches"), { 
       ...formPeluche, 
       stock: 0, 
-      prix_achat: Number(formPeluche.prix_achat),
       prix_vente: Number(formPeluche.prix_vente)
     });
-    setFormPeluche({ categorie: '', prix_achat: '', prix_vente: '', taille: '', couleur: '' });
+    setFormPeluche({ categorie: '', prix_vente: '', taille: '', couleur: '' });
     fetchData();
   };
 
@@ -61,7 +60,7 @@ export default function Catalogue() {
       {/* SECTION FORMULAIRES */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Catégories - Fixation bouton */}
+        {/* Catégories */}
         <div className="lg:col-span-4 bg-white p-6 rounded-[2rem] shadow-xl border-2 border-gray-50">
           <h3 className="text-[#4A3228] font-black mb-6 flex items-center gap-2 uppercase text-sm">
             <i className="fa-solid fa-tags text-[#A62626]"></i> Nouvelles Catégories
@@ -87,7 +86,7 @@ export default function Catalogue() {
           </div>
         </div>
 
-        {/* Formulaire Peluche */}
+        {/* Formulaire Peluche (Sans prix d'achat) */}
         <div className="lg:col-span-8 bg-white p-6 rounded-[2rem] shadow-xl border-2 border-gray-50">
           <h3 className="text-[#4A3228] font-black mb-6 flex items-center gap-2 uppercase text-sm">
             <i className="fa-solid fa-circle-plus text-[#A62626]"></i> Enregistrer un Modèle
@@ -108,10 +107,7 @@ export default function Catalogue() {
               {listeCouleurs.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
 
-            <input type="number" placeholder="Prix Achat (FCFA)" className="p-4 bg-gray-100 rounded-2xl font-bold text-sm" 
-              value={formPeluche.prix_achat} onChange={e => setFormPeluche({...formPeluche, prix_achat: e.target.value})} required />
-
-            <input type="number" placeholder="Prix Vente (FCFA)" className="p-4 bg-gray-100 rounded-2xl font-black text-[#A62626] text-sm" 
+            <input type="number" placeholder="Prix Vente (FCFA)" className="p-4 bg-gray-100 rounded-2xl font-black text-[#A62626] text-sm lg:col-span-2" 
               value={formPeluche.prix_vente} onChange={e => setFormPeluche({...formPeluche, prix_vente: e.target.value})} required />
 
             <button className="bg-[#A62626] text-white p-4 rounded-2xl font-black uppercase text-xs hover:bg-[#4A3228] transition-all shadow-xl active:scale-95">
@@ -121,7 +117,7 @@ export default function Catalogue() {
         </div>
       </div>
 
-      {/* AFFICHAGE PAR CATÉGORIE ET TAILLE */}
+      {/* AFFICHAGE PAR CATÉGORIE (Tableau sans prix d'achat) */}
       <div className="space-y-8">
         {peluchesParCategorie.length === 0 && (
             <div className="bg-white p-20 rounded-[3rem] text-center text-gray-300 italic font-bold">Le catalogue est vide.</div>
@@ -142,7 +138,6 @@ export default function Catalogue() {
                   <tr className="bg-[#FDFCFB] text-[10px] font-black text-gray-400 uppercase border-b">
                     <th className="p-6">Taille</th>
                     <th className="p-6">Couleur</th>
-                    <th className="p-6">Prix Achat</th>
                     <th className="p-6">Prix Vente</th>
                     <th className="p-6 text-right">Action</th>
                   </tr>
@@ -151,13 +146,18 @@ export default function Catalogue() {
                   {groupe.items.map(p => (
                     <tr key={p.id} className="hover:bg-gray-50 transition-all">
                       <td className="p-6 font-black text-xl text-[#A62626]">{p.taille}</td>
-                      <td className="p-6"><span className="px-4 py-1.5 bg-gray-100 rounded-full font-bold text-xs border uppercase">{p.couleur}</span></td>
-                      <td className="p-6 text-gray-400 font-bold italic">{p.prix_achat.toLocaleString()} <span className="text-[8px]">F</span></td>
-                      <td className="p-6 font-black text-[#4A3228] text-lg">{p.prix_vente.toLocaleString()} <span className="text-sm font-normal">FCFA</span></td>
+                      <td className="p-6">
+                        <span className="px-4 py-1.5 bg-gray-100 rounded-full font-bold text-xs border uppercase">
+                          {p.couleur}
+                        </span>
+                      </td>
+                      <td className="p-6 font-black text-[#4A3228] text-lg">
+                        {p.prix_vente.toLocaleString()} <span className="text-sm font-normal">FCFA</span>
+                      </td>
                       <td className="p-6 text-right">
                         <button 
                           onClick={() => deleteModel(p.id)} 
-                          className="w-12 h-12 bg-red-100 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center mx-auto lg:ml-auto"
+                          className="w-12 h-12 bg-red-100 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center ml-auto"
                         >
                           <i className="fa-solid fa-trash-can text-lg"></i>
                         </button>
