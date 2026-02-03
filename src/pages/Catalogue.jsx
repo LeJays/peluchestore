@@ -8,7 +8,7 @@ export default function Catalogue() {
   const [newCat, setNewCat] = useState("");
   const [formPeluche, setFormPeluche] = useState({ categorie: '', prix_vente: '', taille: '', couleur: '' });
 
-  const listeCouleurs = ["Blanc", "Marron", "Orange", "Rose", "Rouge", "Violet"].sort();
+  const listeCouleurs = ["Belge", "Blanc", "Marron", "Orange", "Rose", "Rose Saumon", "Rouge", "Violet"].sort();
 
   useEffect(() => { fetchData(); }, []);
 
