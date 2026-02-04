@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Pencil } from "lucide-react";
 import { db, auth } from '../firebase/config';
 import { collection, getDocs, addDoc, updateDoc, doc, increment, query, orderBy, getDoc } from "firebase/firestore";
 
@@ -183,7 +184,24 @@ export default function Stock() {
                         <span className="text-[9px] font-bold text-gray-400 uppercase mb-2">{p.couleur}</span>
                         <div className="flex items-center gap-2">
                           <div className={`text-sm font-black px-3 py-1 rounded-lg ${p.stock < 5 ? 'bg-red-500 text-white' : 'bg-[#4A3228] text-white'}`}>{p.stock || 0}</div>
-                          <button onClick={() => { const nv = prompt(`Nouveau stock ?`, p.stock); if (nv !== null) modifierStockDirect(p.id, nv); }} className="w-8 h-8 bg-white border rounded-lg text-gray-400 hover:text-[#A62626] flex items-center justify-center"><i className="fa-solid fa-pen-to-square text-[10px]"></i></button>
+                          <button
+                            onClick={() => {
+                              const nv = prompt(`Nouveau stock ?`, p.stock);
+                              if (nv !== null) modifierStockDirect(p.id, nv);
+                            }}
+                            title="Modifier le stock"
+                              className="
+                              w-9 h-9
+                              rounded-xl
+                              bg-white
+                              border border-gray-300
+                              flex items-center justify-center
+                              hover:bg-[#A62626]
+                              transition
+                            "
+                          >
+                            <Pencil size={16} strokeWidth={2} className="text-[#A62626] hover:text-white" />
+                          </button>
                         </div>
                       </div>
                     ))}

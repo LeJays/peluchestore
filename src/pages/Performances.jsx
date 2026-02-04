@@ -45,7 +45,19 @@ export default function Performance() {
         .sort((a, b) => b.qty - a.qty)
         .slice(0, 5);
 
-      const totalV = ventesMois.reduce((acc, v) => acc + (Number(v.prixTotal) || 0), 0);
+      const totalV = ventesMois.reduce((acc, v) => {
+        let montantEncaisse = 0;
+
+        if (v.statut === 'payé' && v.statut_paiement === 'TOTALEMENT_PAYÉ') {
+          montantEncaisse = Number(v.prixTotal) || 0;
+        } 
+        else if (v.statut === 'prépayé') {
+          montantEncaisse = Number(v.montantRembourse) || 0;
+        }
+
+        return acc + montantEncaisse;
+      }, 0);
+
       setStats(prev => ({ ...prev, totalVentes: totalV, topPeluches: topPeluchesData }));
     });
 

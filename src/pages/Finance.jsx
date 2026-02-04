@@ -64,7 +64,7 @@ export default function Finance() {
   const totalDepenses = depenses.reduce((acc, curr) => acc + (Number(curr.montant) || 0), 0);
   
   // NOUVEAUX CALCULS
-  const totalEnCaisse = totalVentes - capital - totalDepenses;
+  const totalEnCaisse = totalVentes + capital - totalDepenses;
   const valeurStock = peluches.reduce((acc, p) => acc + (Number(p.stock || 0) * Number(p.prix_vente || 0)), 0);
 
   const enregistrerRemboursement = async (commande) => {
@@ -91,7 +91,7 @@ export default function Finance() {
           <h3 className={`text-4xl font-black ${totalEnCaisse >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {totalEnCaisse.toLocaleString()} F
           </h3>
-          <p className="text-[9px] mt-2 opacity-60 font-bold italic">(Ventes - Capital - Dépenses)</p>
+          <p className="text-[9px] mt-2 opacity-60 font-bold italic">(Ventes + Capital - Dépenses)</p>
         </div>
 
         <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm relative overflow-hidden">
