@@ -115,110 +115,131 @@ export default function Livraisons() {
     }
   };
 
-  const genererFacture = (commande) => {
-    const date = new Date().toLocaleDateString('fr-FR');
+ // Fonction pour calculer le prix selon la taille et la catégorie
+const calculerPrixUnitaire = (taille, categorie) => {
+  // Convertir en majuscules pour éviter les problèmes de casse
+  const tailleUpper = taille.toUpperCase();
+  const categorieUpper = categorie.toUpperCase();
 
+  if (categorieUpper === "PREMIUM") {
+    if (tailleUpper === "80") return 15000;
+    if (tailleUpper === "100") return 25000;
+  } else if (categorieUpper === "STANDARD") {
+    if (tailleUpper === "80") return 10000;
+    if (tailleUpper === "100") return 20000;
+    if (tailleUpper === "140") return 40000;
+  }
+
+  // Valeur par défaut si aucune correspondance
+  return 0;
+};
+
+// Fonction pour récupérer taille et catégorie depuis pelucheId
+const recupererInfosPeluche = async (pelucheId) => {
+  try {
+    const pelucheRef = doc(db, "peluches", pelucheId);
+    const pelucheSnap = await getDoc(pelucheRef);
+
+    if (!pelucheSnap.exists()) return null;
+
+    const data = pelucheSnap.data();
+    return {
+      taille: data.taille || "N/A",
+      categorie: data.categorie || "N/A"
+    };
+  } catch (err) {
+    console.error("Erreur récupération peluche :", err);
+    return null;
+  }
+};
+
+// Fonction principale pour générer la facture
+const genererFacture = async (commande) => {
+  try {
+    // Récupérer les infos peluche
+    const infos = await recupererInfosPeluche(commande.pelucheId);
+
+    if (!infos) {
+      alert("Infos peluche introuvables");
+      return;
+    }
+
+    const { taille, categorie } = infos;
+
+    // Calcul du prix unitaire et total
+    const prixUnitaire = calculerPrixUnitaire(taille, categorie);
+    const total = prixUnitaire * Number(commande.quantite);
+
+    // Récupération de la date de livraison réelle ou de la date de commande
+    const date = commande.date_livraison_reelle
+      ? commande.date_livraison_reelle.toDate
+        ? commande.date_livraison_reelle.toDate().toLocaleString("fr-FR")
+        : commande.date_livraison_reelle
+      : commande.date || "—";
+
+    // Création du HTML de la facture
     const factureHTML = `
     <html>
-    <head>
-      <title>Facture - PelucheStore Cameroon</title>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          padding: 30px;
-          color: #333;
-        }
-        .header {
-          display: flex;
-          align-items: center;
-          gap: 20px;
-          border-bottom: 2px solid #A62626;
-          padding-bottom: 15px;
-        }
-        .logo {
-          width: 90px;
-        }
-        h1 {
-          margin: 0;
-          color: #A62626;
-          font-size: 26px;
-        }
-        .infos {
-          margin-top: 20px;
-          font-size: 14px;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 25px;
-        }
-        th, td {
-          border: 1px solid #ddd;
-          padding: 12px;
-          text-align: center;
-        }
-        th {
-          background-color: #f4f4f4;
-          font-weight: bold;
-        }
-        .total {
-          margin-top: 20px;
-          font-size: 18px;
-          font-weight: bold;
-          text-align: right;
-          color: #A62626;
-        }
-        .footer {
-          margin-top: 40px;
-          font-size: 12px;
-          text-align: center;
-          color: #666;
-        }
-      </style>
-    </head>
+      <head>
+        <title>Facture - PelucheStore Cameroon</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 30px; color: #333; }
+          .header { display: flex; align-items: center; gap: 20px; border-bottom: 2px solid #A62626; padding-bottom: 15px; }
+          .logo { width: 90px; }
+          h1 { margin: 0; color: #A62626; font-size: 26px; }
+          .infos { margin-top: 20px; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 25px; }
+          th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+          th { background-color: #f4f4f4; font-weight: bold; }
+          .total { margin-top: 20px; font-size: 18px; font-weight: bold; text-align: right; color: #A62626; }
+          .footer { margin-top: 40px; font-size: 12px; text-align: center; color: #666; }
+        </style>
+      </head>
 
-    <body>
-      <div class="header">
-        <img src="/logo.jpeg" class="logo" />
-        <div>
-          <h1>PelucheStore Cameroon</h1>
-          <p><strong>Date :</strong> ${date}</p>
+      <body>
+        <div class="header">
+          <img src="/logo.jpeg" class="logo" />
+          <div>
+            <h1>PelucheStore Cameroon</h1>
+            <p><strong>Date :</strong> ${date}</p>
+          </div>
         </div>
-      </div>
 
-      <div class="infos">
-        <p><strong>Client :</strong> ${commande.client}</p>
-        <p><strong>Téléphone :</strong> ${commande.tel || "—"}</p>
-        <p><strong>Vendeur :</strong> ${commande.livreur_final || "Admin"}</p>
-      </div>
+        <div class="infos">
+          <p><strong>Client :</strong> ${commande.client}</p>
+          <p><strong>Téléphone :</strong> ${commande.tel || "—"}</p>
+          <p><strong>Vendeur :</strong> ${commande.livreur_final || "Admin"}</p>
+          <p><strong>Taille :</strong> ${taille}</p>
+          <p><strong>Catégorie :</strong> ${categorie}</p>
+        </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Produit</th>
-            <th>Quantité</th>
-            <th>Montant</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>${commande.nomArticle}</td>
-            <td>${commande.quantite}</td>
-            <td>${Number(commande.prixTotal).toLocaleString()} FCFA</td>
-          </tr>
-        </tbody>
-      </table>
+        <table>
+          <thead>
+            <tr>
+              <th>Produit</th>
+              <th>Quantité</th>
+              <th>Montant</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>${commande.nomArticle}</td>
+              <td>${commande.quantite}</td>
+              <td>${total.toLocaleString()} FCFA</td>
+            </tr>
+          </tbody>
+        </table>
 
-      <div class="total">
-        Total à payer : ${Number(commande.prixTotal).toLocaleString()} FCFA
-      </div>
+        <div class="total">
+          Total à payer : ${total.toLocaleString()} FCFA
+        </div>
 
-      <div class="footer">
-        Merci pour votre confiance 🤝<br/>
-        <strong>PelucheStore Cameroon</strong><br/>
-        Des cadeaux qui parlent au cœur 💝
-      </div>
-    </body>
+        <div class="footer">
+          Merci pour votre confiance 🤝<br/>
+          <strong>PelucheStore Cameroon</strong><br/>
+          Des cadeaux qui parlent au cœur 💝
+        </div>
+      </body>
     </html>
     `;
 
@@ -226,7 +247,12 @@ export default function Livraisons() {
     win.document.write(factureHTML);
     win.document.close();
     win.print();
-  };
+
+  } catch (err) {
+    alert("Erreur lors de la génération de la facture : " + err.message);
+  }
+};
+
 
   return (
     <div className="space-y-10 p-4 max-w-7xl mx-auto font-['Inter']">

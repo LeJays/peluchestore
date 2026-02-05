@@ -36,8 +36,7 @@ export default function LivreurDashboard() {
       }
     });
     return () => unsubAuth();
-  }, []);
-
+    }, []);
   // 2. Écoute des commandes
   useEffect(() => {
     setLoading(true);
