@@ -42,11 +42,24 @@ export default function Stock() {
 
   const getConnectedUserName = async () => {
     const user = auth.currentUser;
-    if (user) {
-      // On essaye de récupérer le nom depuis ton document utilisateur ou le displayName de Firebase
-      setNomUtilisateur(user.displayName || user.email.split('@')[0]);
+    if (!user) return;
+
+    try {
+      const userRef = doc(db, "utilisateurs", user.uid);
+      const snap = await getDoc(userRef);
+
+      if (snap.exists()) {
+        setNomUtilisateur(snap.data().nom);
+      } else {
+        // secours
+        setNomUtilisateur(user.displayName || user.email.split('@')[0]);
+      }
+    } catch (e) {
+      console.error("Erreur récupération utilisateur :", e);
+      setNomUtilisateur("Admin");
     }
   };
+
 
   const fetchData = async () => {
     const pelSnap = await getDocs(collection(db, "peluches"));
@@ -130,7 +143,21 @@ export default function Stock() {
     } catch (err) { alert("Erreur : " + err.message); }
   };
 
-  const peluchesTriees = [...peluches].sort((a, b) => a.categorie.localeCompare(b.categorie));
+  const peluchesTriees = [...peluches].sort((a, b) => {
+    const catCompare = a.categorie.localeCompare(b.categorie);
+    if (catCompare !== 0) return catCompare;
+    
+    // Si mêmes catégories, on trie par taille
+    // Si ta taille est un string qui représente un nombre, convertis en int
+    const tailleA = parseInt(a.taille) || a.taille;
+    const tailleB = parseInt(b.taille) || b.taille;
+
+    if (typeof tailleA === 'number' && typeof tailleB === 'number') return tailleA - tailleB;
+
+    // Sinon tri alphabétique
+    return String(tailleA).localeCompare(String(tailleB));
+  });
+
   const totalGlobal = peluches.reduce((acc, p) => acc + (p.stock || 0), 0);
   const stockParCouleur = peluches.reduce((acc, p) => {
     acc[p.couleur] = (acc[p.couleur] || 0) + (p.stock || 0);
@@ -178,36 +205,37 @@ export default function Stock() {
                     <h4 className="font-black text-[#4A3228] uppercase text-xs tracking-widest">{cat}</h4>
                   </div>
                   <div className="p-6 grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {peluches.filter(p => p.categorie === cat).map(p => (
-                      <div key={p.id} className="p-4 bg-gray-50 rounded-2xl flex flex-col items-center border border-gray-100 group">
-                        <span className="text-2xl font-black text-[#A62626]">{p.taille}</span>
-                        <span className="text-[9px] font-bold text-gray-400 uppercase mb-2">{p.couleur}</span>
-                        <div className="flex items-center gap-2">
-                          <div className={`text-sm font-black px-3 py-1 rounded-lg ${p.stock < 5 ? 'bg-red-500 text-white' : 'bg-[#4A3228] text-white'}`}>{p.stock || 0}</div>
-                          <button
-                            onClick={() => {
-                              const nv = prompt(`Nouveau stock ?`, p.stock);
-                              if (nv !== null) modifierStockDirect(p.id, nv);
-                            }}
-                            title="Modifier le stock"
-                              className="
-                              w-9 h-9
-                              rounded-xl
-                              bg-white
-                              border border-gray-300
-                              flex items-center justify-center
-                              hover:bg-[#A62626]
-                              transition
-                            "
-                          >
-                            <Pencil size={16} strokeWidth={2} className="text-[#A62626] hover:text-white" />
-                          </button>
+                    {peluchesTriees
+                      .filter(p => p.categorie === cat)
+                      .sort((a, b) => {
+                        const tailleA = parseInt(a.taille) || a.taille;
+                        const tailleB = parseInt(b.taille) || b.taille;
+                        if (typeof tailleA === 'number' && typeof tailleB === 'number') return tailleA - tailleB;
+                        return String(tailleA).localeCompare(String(tailleB));
+                      })
+                      .map(p => (
+                        <div key={p.id} className="p-4 bg-gray-50 rounded-2xl flex flex-col items-center border border-gray-100 group">
+                          <span className="text-2xl font-black text-[#A62626]">{p.taille}</span>
+                          <span className="text-[9px] font-bold text-gray-400 uppercase mb-2">{p.couleur}</span>
+                          <div className="flex items-center gap-2">
+                            <div className={`text-sm font-black px-3 py-1 rounded-lg ${p.stock < 5 ? 'bg-red-500 text-white' : 'bg-[#4A3228] text-white'}`}>{p.stock || 0}</div>
+                            <button
+                              onClick={() => {
+                                const nv = prompt(`Nouveau stock ?`, p.stock);
+                                if (nv !== null) modifierStockDirect(p.id, nv);
+                              }}
+                              title="Modifier le stock"
+                              className="w-9 h-9 rounded-xl bg-white border border-gray-300 flex items-center justify-center hover:bg-[#A62626] transition"
+                            >
+                              <Pencil size={16} strokeWidth={2} className="text-[#A62626] hover:text-white" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
                     ))}
                   </div>
                 </div>
               ))}
+
             </div>
           </div>
         </div>

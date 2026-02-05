@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Trash } from "lucide-react";
 import { db } from '../firebase/config';
 import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore";
 
@@ -157,9 +158,14 @@ export default function Catalogue() {
                       <td className="p-6 text-right">
                         <button 
                           onClick={() => deleteModel(p.id)} 
-                          className="w-12 h-12 bg-red-100 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center justify-center ml-auto"
+                          className="w-12 h-12 rounded-xl
+                              bg-white
+                              border border-gray-300
+                              flex items-center justify-center
+                              hover:bg-[#A62626]
+                              transition"
                         >
-                          <i className="fa-solid fa-trash-can text-lg"></i>
+                          <Trash size={16} strokeWidth={2} className="text-[#A62626] hover:text-white" />
                         </button>
                       </td>
                     </tr>

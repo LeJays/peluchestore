@@ -4,6 +4,7 @@ import {
   collection, onSnapshot, query, where, orderBy, 
   updateDoc, doc, limit, deleteDoc, getDoc 
 } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import { Trash2 } from 'lucide-react'; // Pour une icône sympa
 
 export default function Livraisons() {
@@ -78,21 +79,153 @@ export default function Livraisons() {
 
   const validerLivraison = async (commande) => {
     if (!window.confirm(`Confirmer la livraison de ${commande.client} ?`)) return;
+
     try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+
+      if (!user) {
+        alert("Utilisateur non connecté");
+        return;
+      }
+
+      const userRef = doc(db, "utilisateurs", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      const nomLivreur = userSnap.exists()
+        ? userSnap.data().nom || user.email
+        : user.email;
+
       const updates = {
-        statut_livraison: 'LIVRÉ',
-        date_livraison_reelle: new Date().toLocaleString('fr-FR'),
-        livreur_final: commande.livreur_nom || "Admin" 
+        statut_livraison: "LIVRÉ",
+        date_livraison_reelle: new Date().toLocaleString("fr-FR"),
+        livreur_final: nomLivreur
       };
 
-      if (commande.statut === 'payé' || commande.statut_paiement === 'TOTALEMENT_PAYÉ') {
-        updates.statut_paiement = 'TOTALEMENT_PAYÉ';
+      if (
+        commande.statut === "payé" ||
+        commande.statut_paiement === "TOTALEMENT_PAYÉ"
+      ) {
+        updates.statut_paiement = "TOTALEMENT_PAYÉ";
       }
 
       await updateDoc(doc(db, "commandes", commande.id), updates);
     } catch (err) {
       alert("Erreur : " + err.message);
     }
+  };
+
+  const genererFacture = (commande) => {
+    const date = new Date().toLocaleDateString('fr-FR');
+
+    const factureHTML = `
+    <html>
+    <head>
+      <title>Facture - PelucheStore Cameroon</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          padding: 30px;
+          color: #333;
+        }
+        .header {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          border-bottom: 2px solid #A62626;
+          padding-bottom: 15px;
+        }
+        .logo {
+          width: 90px;
+        }
+        h1 {
+          margin: 0;
+          color: #A62626;
+          font-size: 26px;
+        }
+        .infos {
+          margin-top: 20px;
+          font-size: 14px;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 25px;
+        }
+        th, td {
+          border: 1px solid #ddd;
+          padding: 12px;
+          text-align: center;
+        }
+        th {
+          background-color: #f4f4f4;
+          font-weight: bold;
+        }
+        .total {
+          margin-top: 20px;
+          font-size: 18px;
+          font-weight: bold;
+          text-align: right;
+          color: #A62626;
+        }
+        .footer {
+          margin-top: 40px;
+          font-size: 12px;
+          text-align: center;
+          color: #666;
+        }
+      </style>
+    </head>
+
+    <body>
+      <div class="header">
+        <img src="/logo.jpeg" class="logo" />
+        <div>
+          <h1>PelucheStore Cameroon</h1>
+          <p><strong>Date :</strong> ${date}</p>
+        </div>
+      </div>
+
+      <div class="infos">
+        <p><strong>Client :</strong> ${commande.client}</p>
+        <p><strong>Téléphone :</strong> ${commande.tel || "—"}</p>
+        <p><strong>Vendeur :</strong> ${commande.livreur_final || "Admin"}</p>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Produit</th>
+            <th>Quantité</th>
+            <th>Montant</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${commande.nomArticle}</td>
+            <td>${commande.quantite}</td>
+            <td>${Number(commande.prixTotal).toLocaleString()} FCFA</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="total">
+        Total à payer : ${Number(commande.prixTotal).toLocaleString()} FCFA
+      </div>
+
+      <div class="footer">
+        Merci pour votre confiance 🤝<br/>
+        <strong>PelucheStore Cameroon</strong><br/>
+        Des cadeaux qui parlent au cœur 💝
+      </div>
+    </body>
+    </html>
+    `;
+
+    const win = window.open('', '_blank');
+    win.document.write(factureHTML);
+    win.document.close();
+    win.print();
   };
 
   return (
@@ -169,7 +302,9 @@ export default function Livraisons() {
                 <th className="pb-4 px-2">Client</th>
                 <th className="pb-4 px-2">Article</th>
                 <th className="pb-4 px-2 text-center">Fait par</th>
+                <th className="pb-4 px-2 text-center">Paiement</th>
                 <th className="pb-4 px-2 text-right">Montant</th>
+                <th className="pb-4 px-2 text-center">Facture</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -187,8 +322,29 @@ export default function Livraisons() {
                       {h.livreur_final || "Admin"}
                     </span>
                   </td>
+                  <td className="py-5 px-2 text-center">
+                    <span className={`text-[8px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wider
+                      ${
+                        h.paiement === "Orange Money"
+                          ? "bg-orange-100 text-orange-600"
+                          : h.paiement === "Mobile Money"
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-green-100 text-green-700"
+                      }`}>
+                      {h.paiement || "N/A"}
+                    </span>
+                  </td>
                   <td className="py-5 px-2 text-right font-black text-[#A62626] text-xs italic">
                     {Number(h.prixTotal).toLocaleString()} F
+                  </td>
+                  <td className="py-5 px-2 text-center">
+                    <button
+                      onClick={() => genererFacture(h)}
+                      className="bg-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white p-2 rounded-xl transition"
+                      title="Générer facture"
+                    >
+                      🧾
+                    </button>
                   </td>
                 </tr>
               ))}
