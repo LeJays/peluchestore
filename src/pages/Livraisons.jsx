@@ -32,7 +32,7 @@ export default function Livraisons() {
       collection(db, "commandes"),
       where("statut_livraison", "==", "LIVRÉ"),
       orderBy("date_livraison_reelle", "desc"),
-      limit(50)
+      limit(3000)
     );
 
     const unsubAttente = onSnapshot(qAttente, (snap) => {
