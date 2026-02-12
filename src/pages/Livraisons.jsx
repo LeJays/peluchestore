@@ -339,7 +339,9 @@ const genererFacture = async (commande) => {
                   <td className="py-5 px-2 text-[10px] font-bold text-gray-400">
                     {formatDate(h.date_livraison_reelle)}
                   </td>
-                  <td className="py-5 px-2 font-black text-[#4A3228] text-xs uppercase">{h.client}</td>
+                  <td className="py-5 px-2 font-black text-[#4A3228] text-xs uppercase">
+                    {h.client}
+                  </td>
                   <td className="py-5 px-2 text-[10px] font-bold text-gray-600 uppercase">
                     {h.nomArticle} <span className="text-orange-500 ml-1">x{h.quantite}</span>
                   </td>
@@ -357,7 +359,7 @@ const genererFacture = async (commande) => {
                           ? "bg-yellow-100 text-yellow-700"
                           : "bg-green-100 text-green-700"
                       }`}>
-                      {h.paiement || "N/A"}
+                      {h.paiement}
                     </span>
                   </td>
                   <td className="py-5 px-2 text-right font-black text-[#A62626] text-xs italic">
