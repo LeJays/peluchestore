@@ -7,7 +7,7 @@ import {
 import { onAuthStateChanged, signOut } from "firebase/auth"; // Import de signOut
 import { 
   Truck, Phone, MapPin, Package, CheckCircle, 
-  LogOut, Clock, CheckCheck, Trash2, Smartphone, User 
+  LogOut, Clock, CheckCheck, Trash2, Smartphone, User, MessageCircle
 } from 'lucide-react';
 
 export default function LivreurDashboard() {
@@ -173,10 +173,29 @@ export default function LivreurDashboard() {
 
               <div className="space-y-3">
                 {activeTab !== 'termine' && (
-                  <a href={`tel:${m.tel}`} className="w-full flex items-center justify-center gap-3 bg-blue-600 text-white p-4 rounded-2xl font-black text-xs uppercase shadow-lg active:scale-95">
-                    <Phone size={18} /> Appeler Client
-                  </a>
+                  <div className="grid grid-cols-2 gap-3">
+                    
+                    {/* Bouton appel normal */}
+                    <a 
+                      href={`tel:${m.tel}`} 
+                      className="flex items-center justify-center gap-3 bg-blue-600 text-white p-4 rounded-2xl font-black text-xs uppercase shadow-lg active:scale-95"
+                    >
+                      <Phone size={18} /> Appeler
+                    </a>
+
+                    {/* Bouton WhatsApp */}
+                    <a 
+                      href={`https://wa.me/237${m.tel.replace(/\D/g, '').slice(-9)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-3 bg-green-500 text-white p-4 rounded-2xl font-black text-xs uppercase shadow-lg active:scale-95"
+                    >
+                      <MessageCircle size={18} /> WhatsApp
+                    </a>
+
+                  </div>
                 )}
+
 
                 {activeTab === 'attente' && (
                   <div className="grid grid-cols-4 gap-2">
