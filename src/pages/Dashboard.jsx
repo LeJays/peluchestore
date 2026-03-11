@@ -18,10 +18,28 @@ export default function Dashboard() {
     livraisonsAttente: 0,
     fluxFinancier: [],
     dernieresVentes: [],
-    repartitionPaiement: []
+    repartitionPaiement: [],
+    topClients: []
   });
 
   const COLORS = ['#10B981', '#F59E0B', '#3B82F6', '#EF4444'];
+
+  function parseDateFR(dateString) {
+    if (!dateString) return new Date();
+
+    const [datePart, timePart] = dateString.split(" ");
+    const [day, month, year] = datePart.split("/");
+    const [hour, minute, second] = timePart.split(":");
+
+    return new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second)
+    );
+  }
 
   useEffect(() => {
     const aujourdhui = new Date();
@@ -49,10 +67,14 @@ export default function Dashboard() {
         }));
 
         onSnapshot(collection(db, "mouvements_stock"), (snapMouv) => {
-          const allMouvements = snapMouv.docs.map(d => ({
-            ...d.data(),
-            dateJS: d.data().timestamp?.toDate ? d.data().timestamp.toDate() : new Date()
-          }));
+          const allMouvements = snapMouv.docs.map(d => {
+            const data = d.data();
+
+            return {
+              ...data,
+              dateJS: parseDateFR(data.date)
+            };
+          });
 
           const moisNoms = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
           
@@ -95,6 +117,27 @@ export default function Dashboard() {
             value: allCommandes.filter(c => c.paiement === m).length
           })).filter(v => v.value > 0);
 
+          // CALCUL TOP CLIENTS
+const clientsMap = {};
+
+allCommandes.forEach(c => {
+  const client = c.client || "Inconnu";
+  const montant = c.statut === "payé"
+    ? Number(c.prixTotal || 0)
+    : Number(c.montantRembourse || 0);
+
+  if (!clientsMap[client]) {
+    clientsMap[client] = 0;
+  }
+
+  clientsMap[client] += montant;
+});
+
+const topClients = Object.entries(clientsMap)
+  .map(([name, total]) => ({ name, total }))
+  .sort((a, b) => b.total - a.total)
+  .slice(0, 5);
+
           setStats(prev => ({ 
             ...prev, 
             caJour: allCommandes.filter(c => c.dateJS >= aujourdhui).reduce((acc, c) => acc + (c.statut === 'payé' ? Number(c.prixTotal || 0) : Number(c.montantRembourse || 0)), 0),
@@ -102,7 +145,8 @@ export default function Dashboard() {
             livraisonsAttente: allCommandes.filter(c => c.statut_livraison === "EN_ATTENTE").length,
             dernieresVentes: allCommandes.length > 0 ? [...allCommandes].sort((a,b) => b.dateJS - a.dateJS).slice(0, 4) : [],
             fluxFinancier: fluxData,
-            repartitionPaiement: repartition
+            repartitionPaiement: repartition,
+            topClients: topClients
           }));
         });
       });
@@ -204,6 +248,44 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+        <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+  
+  <h3 className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest">
+    Top 5 Clients
+  </h3>
+
+  <div className="space-y-4">
+    {stats.topClients.map((c, index) => (
+      <div
+        key={index}
+        className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-transparent hover:border-gray-200 transition-all"
+      >
+        <div className="flex items-center gap-4">
+
+          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm">
+            #{index + 1}
+          </div>
+
+          <div>
+            <p className="text-[11px] font-black text-[#4A3228] uppercase">
+              {c.name}
+            </p>
+
+            <p className="text-[9px] font-bold text-gray-400 uppercase italic">
+              Client fidèle
+            </p>
+          </div>
+
+        </div>
+
+        <p className="text-sm font-black text-green-600">
+          {Number(c.total).toLocaleString()} F
+        </p>
+      </div>
+    ))}
+  </div>
+
+</div>
       </div>
     </div>
   );

@@ -11,6 +11,10 @@ export default function Livraisons() {
   const [commandesEnAttente, setCommandesEnAttente] = useState([]);
   const [historiqueLivraisons, setHistoriqueLivraisons] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filtreClient, setFiltreClient] = useState("");
+  const [filtreArticle, setFiltreArticle] = useState("");
+  const [filtreLivreur, setFiltreLivreur] = useState("");
+  const [filtreDate, setFiltreDate] = useState("");
 
   // FONCTION POUR ÉVITER L'ERREUR {seconds, nanoseconds}
   const formatDate = (dateField) => {
@@ -40,9 +44,42 @@ export default function Livraisons() {
       setLoading(false);
     });
 
-    const unsubLivre = onSnapshot(qLivre, (snap) => {
-      setHistoriqueLivraisons(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const parseDateFR = (dateStr) => {
+  if (!dateStr) return new Date(0);
+
+  try {
+    if (typeof dateStr === "string") {
+      const [datePart, timePart] = dateStr.split(" ");
+      const [day, month, year] = datePart.split("/");
+      const [hour = 0, minute = 0, second = 0] = (timePart || "").split(":");
+
+      return new Date(year, month - 1, day, hour, minute, second);
+    }
+
+    if (dateStr.seconds) {
+      return new Date(dateStr.seconds * 1000);
+    }
+
+    return new Date(dateStr);
+  } catch {
+    return new Date(0);
+  }
+};
+
+const unsubLivre = onSnapshot(qLivre, (snap) => {
+  const data = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
+
+  const sorted = data.sort((a, b) => {
+    const dateA = parseDateFR(a.date_livraison_reelle);
+    const dateB = parseDateFR(b.date_livraison_reelle);
+    return dateB.getTime() - dateA.getTime();
+  });
+
+  setHistoriqueLivraisons(sorted);
+});
 
     return () => { unsubAttente(); unsubLivre(); };
   }, []);
@@ -253,6 +290,27 @@ const genererFacture = async (commande) => {
   }
 };
 
+const historiqueFiltre = historiqueLivraisons.filter((h) => {
+
+  const clientMatch = h.client
+    ?.toLowerCase()
+    .includes(filtreClient.toLowerCase());
+
+  const articleMatch = h.nomArticle
+    ?.toLowerCase()
+    .includes(filtreArticle.toLowerCase());
+
+  const livreurMatch = (h.livreur_final || "")
+    .toLowerCase()
+    .includes(filtreLivreur.toLowerCase());
+
+  const dateMatch = filtreDate
+    ? formatDate(h.date_livraison_reelle).includes(filtreDate)
+    : true;
+
+  return clientMatch && articleMatch && livreurMatch && dateMatch;
+});
+
 
   return (
     <div className="space-y-10 p-4 max-w-7xl mx-auto font-['Inter']">
@@ -318,6 +376,41 @@ const genererFacture = async (commande) => {
       </section>
 
       {/* TABLEAU HISTORIQUE */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+
+  <input
+    type="text"
+    placeholder="🔎 Client"
+    value={filtreClient}
+    onChange={(e) => setFiltreClient(e.target.value)}
+    className="border rounded-xl px-3 py-2 text-sm"
+  />
+
+  <input
+    type="text"
+    placeholder="📦 Article"
+    value={filtreArticle}
+    onChange={(e) => setFiltreArticle(e.target.value)}
+    className="border rounded-xl px-3 py-2 text-sm"
+  />
+
+  <input
+    type="text"
+    placeholder="👨‍💼 Fait par"
+    value={filtreLivreur}
+    onChange={(e) => setFiltreLivreur(e.target.value)}
+    className="border rounded-xl px-3 py-2 text-sm"
+  />
+
+  <input
+    type="text"
+    placeholder="📅 Date (ex: 11/03/2026)"
+    value={filtreDate}
+    onChange={(e) => setFiltreDate(e.target.value)}
+    className="border rounded-xl px-3 py-2 text-sm"
+  />
+
+</div>
       <section className="bg-white rounded-[2.5rem] p-8 shadow-2xl border border-gray-50 overflow-hidden">
         <h3 className="text-xl font-black text-[#4A3228] uppercase italic mb-8">Historique des Livraisons</h3>
         <div className="overflow-x-auto">
@@ -334,7 +427,7 @@ const genererFacture = async (commande) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {historiqueLivraisons.map((h) => (
+              {historiqueFiltre.map((h) => (
                 <tr key={h.id} className="group hover:bg-gray-50 transition-colors">
                   <td className="py-5 px-2 text-[10px] font-bold text-gray-400">
                     {formatDate(h.date_livraison_reelle)}
