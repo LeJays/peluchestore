@@ -118,25 +118,27 @@ export default function Dashboard() {
           })).filter(v => v.value > 0);
 
           // CALCUL TOP CLIENTS
-const clientsMap = {};
+          // Filtrer commandes du mois en cours
+          const commandesMois = allCommandes.filter(c => c.dateJS >= debutMois);
+          const clientsMap = {};
 
-allCommandes.forEach(c => {
-  const client = c.client || "Inconnu";
-  const montant = c.statut === "payé"
-    ? Number(c.prixTotal || 0)
-    : Number(c.montantRembourse || 0);
+          commandesMois.forEach(c => {
+            const client = c.client || "Inconnu";
+            const montant = c.statut === "payé"
+              ? Number(c.prixTotal || 0)
+              : Number(c.montantRembourse || 0);
 
-  if (!clientsMap[client]) {
-    clientsMap[client] = 0;
-  }
+            if (!clientsMap[client]) {
+              clientsMap[client] = 0;
+            }
 
-  clientsMap[client] += montant;
-});
+            clientsMap[client] += montant;
+          });
 
-const topClients = Object.entries(clientsMap)
-  .map(([name, total]) => ({ name, total }))
-  .sort((a, b) => b.total - a.total)
-  .slice(0, 5);
+          const topClients = Object.entries(clientsMap)
+            .map(([name, total]) => ({ name, total }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 5);
 
           setStats(prev => ({ 
             ...prev, 

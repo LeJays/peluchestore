@@ -9,6 +9,53 @@ export default function Inventaire() {
   const [commandes, setCommandes] = useState([]);
   const [depenses, setDepenses] = useState([]);
   const [chargement, setChargement] = useState(true);
+  
+  const [topClients, setTopClients] = useState([]);
+
+  useEffect(() => {
+    // 1. Écoute des peluches
+    const unsubPeluches = onSnapshot(collection(db, "peluches"), (snap) => {
+      setPeluches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    // 2. Écoute des commandes
+    const unsubCommandes = onSnapshot(collection(db, "commandes"), (snap) => {
+      const commandesData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // --- TOP 5 CLIENTS ANNEE EN COURS ---
+      const anneeCourante = new Date().getFullYear();
+      const commandesAnnee = commandesData.filter(c => {
+        const date = c.dateJS?.toDate ? c.dateJS.toDate() : new Date(c.date || Date.now());
+        return date.getFullYear() === anneeCourante;
+      });
+
+      const clientsMap = {};
+      commandesAnnee.forEach(c => {
+        if(c.statut !== "payé") return; // <-- ne prendre que les commandes payées
+        const client = c.client || "Inconnu";
+        const montant = Number(c.prixTotal || 0);
+        if (!clientsMap[client]) clientsMap[client] = 0;
+        clientsMap[client] += montant;
+      });
+
+      const top5 = Object.entries(clientsMap)
+        .map(([name, total]) => ({ name, total }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 5);
+
+      setTopClients(top5);
+      setCommandes(commandesData);
+    });
+
+    // 3. Écoute des dépenses
+    const unsubDepenses = onSnapshot(collection(db, "depenses"), (snap) => {
+      setDepenses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setChargement(false);
+    });
+
+    // Nettoyage à la destruction du composant
+    return () => { unsubPeluches(); unsubCommandes(); unsubDepenses(); };
+  }, []);
 
   useEffect(() => {
     // 1. Écoute des peluches
@@ -166,6 +213,26 @@ export default function Inventaire() {
           ))}
         </div>
       </div>
+      {/* SECTION 5 : TOP 5 CLIENTS ANNEE COURANTE */}
+<div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-50 mt-8">
+  <h3 className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest">
+    Top 5 Clients Année {new Date().getFullYear()}
+  </h3>
+  <div className="space-y-4">
+    {topClients.map((c, index) => (
+      <div key={index} className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-transparent hover:border-gray-200 transition-all">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm">#{index+1}</div>
+          <div>
+            <p className="text-[11px] font-black text-[#4A3228] uppercase">{c.name}</p>
+            <p className="text-[9px] font-bold text-gray-400 uppercase italic">Client fidèle</p>
+          </div>
+        </div>
+        <p className="text-sm font-black text-green-600">{Number(c.total).toLocaleString()} F</p>
+      </div>
+    ))}
+  </div>
+</div>
     </div>
   );
 }
