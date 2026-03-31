@@ -121,9 +121,15 @@ export default function Dashboard() {
           // Filtrer commandes du mois en cours
           const commandesMois = allCommandes.filter(c => c.dateJS >= debutMois);
           const clientsMap = {};
+          const displayNames = {};
 
           commandesMois.forEach(c => {
-            const client = c.client || "Inconnu";
+            const rawClient = c.client || "Inconnu";
+            const client = rawClient
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .trim();
             const montant = c.statut === "payé"
               ? Number(c.prixTotal || 0)
               : Number(c.montantRembourse || 0);
@@ -131,12 +137,15 @@ export default function Dashboard() {
             if (!clientsMap[client]) {
               clientsMap[client] = 0;
             }
+            if (!displayNames[client]) {
+              displayNames[client] = rawClient;
+            }
 
-            clientsMap[client] += montant;
+            clientsMap[client] += 1;
           });
 
           const topClients = Object.entries(clientsMap)
-            .map(([name, total]) => ({ name, total }))
+            .map(([key, total]) => ({name: displayNames[key],total}))
             .sort((a, b) => b.total - a.total)
             .slice(0, 5);
 
@@ -281,7 +290,7 @@ export default function Dashboard() {
         </div>
 
         <p className="text-sm font-black text-green-600">
-          {Number(c.total).toLocaleString()} F
+          {c.total} commandes
         </p>
       </div>
     ))}
