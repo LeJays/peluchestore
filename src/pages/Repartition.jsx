@@ -52,6 +52,18 @@ export default function Repartition() {
     };
   }, [moisSelectionne]);
 
+  const plafonds = {
+    "Loyer": 50000,
+    "Connexion": 20000,
+    "Salaire": 100000,
+    "Électricité": 15000,
+    "Autre": 30000
+  };
+
+  let surplus = 0;
+
+
+
   // Définition des catégories
   const categories = [
     { name: "Loyer", part: 0.4 * 0.3 },
@@ -61,24 +73,69 @@ export default function Repartition() {
     { name: "Autre", part: 0.4 * 0.15 },
     { name: "Cotisation", part: 0.3 },
     { name: "Achat peluche", part: 0.3 * 0.4 },
-    { name: "Achat coton", part: 0.3 * 0.3 },
-    { name: "Transport", part: 0.3 * 0.3 },
+    { name: "Achat coton", part: 0.3 * 0.2 },
+    { name: "Transport", part: 0.3 * 0.4 },
   ];
 
-  const fonctionnement = categories.slice(0, 5).map(c => ({ ...c, montant: totalVentes * c.part }));
-  const cotisation = categories.slice(5, 6).map(c => ({ ...c, montant: totalVentes * c.part }));
-  const restockage = categories.slice(6).map(c => ({ ...c, montant: totalVentes * c.part }));
+  const fonctionnement = categories.slice(0, 5).map(c => {
+    const montantBrut = totalVentes * c.part;
+    const plafond = plafonds[c.name] || montantBrut;
 
-  const chargesRestantes = categories.map(c => {
+    if (montantBrut > plafond) {
+      surplus += (montantBrut - plafond);
+    }
+
+    return {
+      ...c,
+      montant: Math.min(montantBrut, plafond)
+    };
+  });
+
+
+  //const fonctionnement = categories.slice(0, 5).map(c => ({ ...c, montant: totalVentes * c.part }));
+  const cotisation = categories.slice(5, 6).map(c => ({ ...c, montant: totalVentes * c.part }));
+  const restockage = categories.slice(6).map(c => ({ ...c, montant: totalVentes * c.part + surplus }));
+
+  const chargesRestantes = (() => {
+
+  // 🔥 recalcul du surplus (comme dans fonctionnement)
+  let surplusCalcule = 0;
+
+  categories.slice(0, 5).forEach(c => {
+    const montantBrut = totalVentes * c.part;
+    const plafond = plafonds[c.name] || montantBrut;
+
+    if (montantBrut > plafond) {
+      surplusCalcule += (montantBrut - plafond);
+    }
+  });
+
+  return categories.map(c => {
     const dejaDepense = depenses
       .filter(d => d.type === c.name)
       .reduce((acc, d) => acc + Number(d.montant || 0), 0);
+
+    let montantAutorise = totalVentes * c.part;
+
+    // 🔴 CAS 1 : fonctionnement → plafond
+    if (plafonds[c.name] !== undefined) {
+      montantAutorise = Math.min(montantAutorise, plafonds[c.name]);
+    }
+
+    // 🟢 CAS 2 : restockage → reçoit le surplus
+    if (["Achat peluche", "Achat coton", "Transport"].includes(c.name)) {
+      montantAutorise += surplusCalcule;
+    }
+
     return {
       ...c,
       dejaDepense,
-      restant: Math.max((totalVentes * c.part) - dejaDepense, 0)
+      montantAutorise,
+      restant: Math.max(montantAutorise - dejaDepense, 0)
     };
   });
+
+})();
 
   const renderTable = (title, data) => (
     <div className="bg-white p-6 rounded-[3rem] border border-gray-100 shadow-sm mb-8">
