@@ -12,6 +12,7 @@ import Depenses from './Depenses';
 import Performance from './Performances'; 
 import Inventaire from './Inventaire'; 
 import Repartition from './Repartition';
+import SuiviDepenses from './SuiviDepenses'; 
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -77,6 +78,7 @@ export default function AdminDashboard() {
     { id: 'depenses', label: 'Gestion Dépenses', icon: 'fa-money-bill-trend-up' },
     { id: 'performance', label: 'Performances', icon: 'fa-ranking-star' },
     { id: 'repartition', label: 'Répartition Fonds', icon: 'fa-pie-chart' },
+    { id: 'suivi-depenses', label: 'Suivi Dépenses', icon: 'fa-table' },
     { id: 'inventaire', label: 'Inventaire Global', icon: 'fa-clipboard-list' }
   ];
 
@@ -187,6 +189,7 @@ export default function AdminDashboard() {
               activeTab === 'depenses' ? <Depenses /> : 
               activeTab === 'performance' ? <Performance /> : 
               activeTab === 'repartition' ? <Repartition /> :
+              activeTab === 'suivi-depenses' ? <SuiviDepenses /> :
               activeTab === 'inventaire' ? <Inventaire /> : null}
           </div>
         </section>

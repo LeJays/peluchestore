@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase/config';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, getDoc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, getDoc, updateDoc, getDocs } from "firebase/firestore";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts';
 // IMPORT DES ICÔNES LUCIDE
 import { Pencil, Check, X, Wallet, TrendingDown, Calendar, User, PlusCircle } from 'lucide-react';
@@ -10,14 +10,14 @@ export default function Depenses() {
   const [loading, setLoading] = useState(true);
   const [nomUtilisateur, setNomUtilisateur] = useState('Chargement...');
 
-  const [type, setType] = useState("loyer");
+  const [type, setType] = useState("Loyer");
   const [montant, setMontant] = useState("");
   const [autreNom, setAutreNom] = useState("");
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({ type: '', montant: '' });
 
-  const typesDepense = ["loyer", "connexion", "courses", "salaire", "coton", "transport", "achat peluches", "cotisation", "electricite", "autre"];
-  const COLORS = ['#4A3228', '#A62626', '#8B5CF6', '#10B981', '#F59E0B', '#3B82F6', '#EC4899', '#6B7280', '#06B6D4', '#D1D5DB'];
+  const typesDepense = ["Loyer", "Connexion", "Salaire", "Achat coton", "Transport", "Achat peluche", "Cotisation", "Électricité", "Autre"];
+  const COLORS = ['#4A3228', '#A62626', '#10B981', '#F59E0B', '#3B82F6', '#EC4899', '#6B7280', '#06B6D4', '#D1D5DB'];
 
   useEffect(() => {
     fetchDepenses();
@@ -43,20 +43,84 @@ export default function Depenses() {
   };
 
   const handleAjouter = async (e) => {
-    e.preventDefault();
-    if (!montant) return;
-    try {
-      await addDoc(collection(db, "depenses"), {
-        type: type === "autre" ? autreNom : type,
-        typeOriginal: type,
-        montant: Number(montant),
-        faitPar: nomUtilisateur,
-        date: new Date().toLocaleDateString('fr-FR'),
-        timestamp: serverTimestamp()
-      });
-      setMontant(""); setAutreNom(""); setType("loyer");
-    } catch (err) { alert(err.message); }
+  e.preventDefault();
+  if (!montant) return;
+
+  const depenseType = type === "autre" ? autreNom : type;
+
+  // 1️⃣ Calcul du total des ventes du mois à partir de la collection "commandes"
+  const now = new Date();
+  const debutMois = new Date(now.getFullYear(), now.getMonth(), 1);
+  const finMois = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+  let totalVentesMois = 0;
+  try {
+    const commandesSnap = await getDocs(collection(db, "commandes"));
+    commandesSnap.forEach(doc => {
+      const data = doc.data();
+      const date = data.timestamp?.toDate?.();
+      if (!date) return;
+      if (date >= debutMois && date <= finMois) {
+        if (data.statut === "payé" && data.statut_paiement === "TOTALEMENT_PAYÉ") {
+          totalVentesMois += Number(data.prixTotal) || 0;
+        } else if (data.statut === "prépayé") {
+          totalVentesMois += Number(data.montantRembourse) || 0;
+        }
+      }
+    });
+  } catch (err) {
+    alert("Erreur lors du calcul du total des ventes : " + err.message);
+    return;
+  }
+
+  // 2️⃣ Définition des pourcentages comme dans Repartition
+  const repartition = {
+    "Loyer": 0.4*0.3,
+    "Connexion": 0.4*0.1,
+    "Salaire": 0.4*0.3,
+    "Électricité": 0.4*0.15,
+    "Autre": 0.4*0.15,
+    "Cotisation": 0.3,
+    "Achat peluche": 0.3*0.4,
+    "Achat coton": 0.3*0.3,
+    "Transport": 0.3*0.3
   };
+
+  const limite = totalVentesMois * (repartition[depenseType] || 1);
+
+  // 3️⃣ Calcul des dépenses déjà faites ce mois pour ce type
+  const dejaDepense = depenses
+    .filter(d => {
+      const dDate = new Date(d.timestamp?.toDate());
+      return d.type === depenseType &&
+             dDate.getMonth() === now.getMonth() &&
+             dDate.getFullYear() === now.getFullYear();
+    })
+    .reduce((acc,curr)=> acc + (Number(curr.montant)||0), 0);
+
+  // 4️⃣ Vérification de la limite
+  if(Number(montant) + dejaDepense > limite){
+    alert(`Impossible d'ajouter cette dépense.\nLimite pour ce type ce mois : ${limite.toLocaleString()} F\nDéjà dépensé : ${dejaDepense.toLocaleString()} F`);
+    return;
+  }
+
+  // 5️⃣ Ajout de la dépense si ok
+  try {
+    await addDoc(collection(db, "depenses"), {
+      type: depenseType,
+      typeOriginal: type,
+      montant: Number(montant),
+      faitPar: nomUtilisateur,
+      date: new Date().toLocaleDateString('fr-FR'),
+      timestamp: serverTimestamp()
+    });
+    setMontant(""); 
+    setAutreNom(""); 
+    setType("Loyer");
+  } catch (err) { 
+    alert(err.message); 
+  }
+};
 
   const startEdit = (d) => {
     setEditId(d.id);
