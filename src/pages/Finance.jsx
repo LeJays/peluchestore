@@ -10,6 +10,33 @@ export default function Finance() {
   const [isEditingCapital, setIsEditingCapital] = useState(false);
   const [nouveauCapital, setNouveauCapital] = useState("");
   const [loading, setLoading] = useState(true);
+  const [montantManuel, setMontantManuel] = useState("");
+  const [descriptionManuelle, setDescriptionManuelle] = useState("");
+
+  const ajouterVenteManuelle = async (e) => {
+    e.preventDefault();
+    if (!montantManuel) return;
+
+    try {
+      await setDoc(doc(collection(db, "commandes")), {
+        client: "VENTE DIRECTE",
+        nomArticle: descriptionManuelle || "Vente manuelle",
+        prixTotal: Number(montantManuel),
+        montantRembourse: Number(montantManuel),
+        quantite: 1,
+        statut: "payé",
+        statut_paiement: "TOTALEMENT_PAYÉ",
+        paiement: "Cash",
+        manuel: true,
+        timestamp: new Date()
+      });
+
+      setMontantManuel("");
+      setDescriptionManuelle("");
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   useEffect(() => {
     const unsubCapital = onSnapshot(doc(db, "settings", "finance"), (doc) => {
@@ -133,6 +160,36 @@ export default function Finance() {
           <p className="text-xl font-black text-red-500">{totalDettes.toLocaleString()} F</p>
         </div>
       </div>
+      <div className="bg-white p-6 rounded-[2rem] border shadow-sm">
+        <h3 className="text-[10px] font-black text-gray-400 uppercase mb-4 tracking-widest">
+          ➕ Ajouter une vente manuelle
+        </h3>
+
+        <form onSubmit={ajouterVenteManuelle} className="flex flex-col md:flex-row gap-4">
+          
+          <input
+            type="text"
+            placeholder="Description (optionnel)"
+            value={descriptionManuelle}
+            onChange={(e) => setDescriptionManuelle(e.target.value)}
+            className="flex-1 p-3 bg-gray-50 rounded-xl font-bold text-sm"
+          />
+
+          <input
+            type="number"
+            placeholder="Montant (FCFA)"
+            value={montantManuel}
+            onChange={(e) => setMontantManuel(e.target.value)}
+            className="w-40 p-3 bg-gray-50 rounded-xl font-bold text-sm"
+            required
+          />
+
+          <button className="bg-[#A62626] text-white px-6 py-3 rounded-xl font-black text-xs uppercase hover:bg-[#4A3228] transition-all">
+            Ajouter
+          </button>
+
+        </form>
+      </div>
 
       {/* GRAPHE MODES DE PAIEMENT */}
       <div className="bg-white p-8 rounded-[3rem] border shadow-sm">
@@ -187,6 +244,7 @@ export default function Finance() {
           </tbody>
         </table>
       </div>
+      
     </div>
   );
 }
