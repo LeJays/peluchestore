@@ -73,20 +73,54 @@ export default function Depenses() {
     return;
   }
 
-  // 2️⃣ Définition des pourcentages comme dans Repartition
-  const repartition = {
-    "Loyer": 0.4*0.3,
-    "Connexion": 0.4*0.1,
-    "Salaire": 0.4*0.3,
-    "Électricité": 0.4*0.15,
-    "Autre": 0.4*0.15,
-    "Cotisation": 0.3,
-    "Achat peluche": 0.3*0.4,
-    "Achat coton": 0.3*0.3,
-    "Transport": 0.3*0.3
-  };
+  // 🔥 PLAFONDS (comme Repartition)
+const plafonds = {
+  "Loyer": 50000,
+  "Connexion": 20000,
+  "Salaire": 100000,
+  "Électricité": 15000,
+  "Autre": 30000
+};
 
-  const limite = totalVentesMois * (repartition[depenseType] || 1);
+// 🔥 POURCENTAGES
+const repartition = {
+  "Loyer": 0.4*0.3,
+  "Connexion": 0.4*0.1,
+  "Salaire": 0.4*0.3,
+  "Électricité": 0.4*0.15,
+  "Autre": 0.4*0.15,
+  "Cotisation": 0.3,
+  "Achat peluche": 0.3*0.4,
+  "Achat coton": 0.3*0.2,
+  "Transport": 0.3*0.4
+};
+
+// 🔥 1️⃣ CALCUL SURPLUS (comme Repartition)
+let surplus = 0;
+
+Object.keys(plafonds).forEach(type => {
+  const montantBrut = totalVentesMois * (repartition[type] || 0);
+  const plafond = plafonds[type];
+
+  if (montantBrut > plafond) {
+    surplus += (montantBrut - plafond);
+  }
+});
+
+// 🔥 2️⃣ CALCUL LIMITE RÉELLE
+let limite = totalVentesMois * (repartition[depenseType] || 1);
+
+// 👉 fonctionnement → plafond
+if (plafonds[depenseType] !== undefined) {
+  limite = Math.min(limite, plafonds[depenseType]);
+}
+
+// 👉 restockage → + surplus
+if (["Achat peluche", "Achat coton", "Transport"].includes(depenseType)) {
+  const totalPartRestockage = 0.3;
+
+  limite += surplus * ((repartition[depenseType]) / totalPartRestockage);
+}
 
   // 3️⃣ Calcul des dépenses déjà faites ce mois pour ce type
   const dejaDepense = depenses
