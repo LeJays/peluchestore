@@ -163,49 +163,55 @@ export default function Repartition() {
     </div>
   );
 
-  const renderChargesRestantes = () => (
-  <div className="bg-white p-6 rounded-[3rem] border border-gray-100 shadow-sm mb-8">
-    <h3 className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest text-center">
-      Charges restantes ce mois
-    </h3>
+  const renderChargesRestantes = () => {
+  const fonctionnement = chargesRestantes.slice(0, 5);
+  const cotisation = chargesRestantes.slice(5, 6);
+  const restockage = chargesRestantes.slice(6);
 
-    <div className="space-y-4">
-      {chargesRestantes.map((item, idx) => (
-        <div
-          key={idx}
-          className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-transparent hover:border-gray-200 transition-all"
-        >
-          {/* LEFT */}
-          <div className="flex items-center gap-4 w-1/2">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm text-white font-bold"
-              style={{ backgroundColor: COLORS[idx % COLORS.length] }}
-            >
-              #{idx + 1}
-            </div>
+  const renderBloc = (title, data) => (
+    <div className="bg-white p-6 rounded-[3rem] border border-gray-100 shadow-sm">
+      <h3 className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest text-center">
+        {title}
+      </h3>
 
-            <div>
+      <div className="space-y-4">
+        {data.map((item, idx) => (
+          <div
+            key={idx}
+            className="flex items-center justify-between bg-gray-100 p-4 rounded-2xl"
+          >
+            {/* LEFT */}
+            <div className="flex items-center gap-4">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-bold"
+                style={{ backgroundColor: COLORS[idx % COLORS.length] }}
+              >
+                #{idx + 1}
+              </div>
+
               <p className="text-[11px] font-black text-[#4A3228] uppercase">
                 {item.name}
               </p>
-
-              <p className="text-[10px] text-gray-400 font-bold">
-                Déjà : {item.dejaDepense.toLocaleString()} F
-              </p>
             </div>
-          </div>
 
-          {/* RIGHT */}
-          <p className={`text-sm font-black w-40 text-right ${
-            item.restant === 0 ? "text-red-500" : "text-green-600"
-          }`}>
-            {item.restant.toLocaleString()} F
-          </p>
-        </div>
-      ))}
+            {/* RIGHT */}
+            <p className="text-sm font-black text-green-600">
+              {item.restant.toLocaleString()} F
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {renderBloc("Fonctionnement (40%)", fonctionnement)}
+      {renderBloc("Cotisation (30%)", cotisation)}
+      {renderBloc("Restockage (30%)", restockage)}
+    </div>
+  );
+};
   return (
     <div className="space-y-6 pb-20">
         {/* Sélection du mois */}
@@ -224,13 +230,16 @@ export default function Repartition() {
         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Recette du mois</p>
         <h2 className="text-3xl font-black text-[#4A3228] mt-2">{totalVentes.toLocaleString()} F</h2>
       </div>
+       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Charges restantes ce mois</p>
 
+      {renderChargesRestantes()}
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Répartition des charges</p>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {renderTable("Fonctionnement (40%)", fonctionnement)}
         {renderTable("Cotisation (30%)", cotisation)}
         {renderTable("Restockage (30%)", restockage)}
       </div>
-      {renderChargesRestantes()}
+      
     </div>
   );
 }
