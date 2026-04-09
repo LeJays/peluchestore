@@ -164,20 +164,48 @@ export default function Repartition() {
   );
 
   const renderChargesRestantes = () => (
-    <div className="bg-white p-6 rounded-[3rem] border border-gray-100 shadow-sm mb-8">
-      <h3 className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest text-center">Charges restantes ce mois</h3>
-      <div className="space-y-4">
-        {chargesRestantes.map((item, idx) => (
-          <div key={idx} className="flex justify-between bg-gray-50 p-4 rounded-2xl border border-transparent hover:border-gray-200 transition-all">
-            <p className="text-[11px] font-black text-[#4A3228] uppercase w-1/3">{item.name}</p>
-            <p className="text-[11px] font-bold text-gray-500 w-1/3">Déjà dépensé : {item.dejaDepense.toLocaleString()} F</p>
-            <p className="text-[11px] font-black text-red-500 w-1/3 text-right">Restant : {item.restant.toLocaleString()} F</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  <div className="bg-white p-6 rounded-[3rem] border border-gray-100 shadow-sm mb-8">
+    <h3 className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest text-center">
+      Charges restantes ce mois
+    </h3>
 
+    <div className="space-y-4">
+      {chargesRestantes.map((item, idx) => (
+        <div
+          key={idx}
+          className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-transparent hover:border-gray-200 transition-all"
+        >
+          {/* LEFT */}
+          <div className="flex items-center gap-4 w-1/2">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm text-white font-bold"
+              style={{ backgroundColor: COLORS[idx % COLORS.length] }}
+            >
+              #{idx + 1}
+            </div>
+
+            <div>
+              <p className="text-[11px] font-black text-[#4A3228] uppercase">
+                {item.name}
+              </p>
+
+              <p className="text-[10px] text-gray-400 font-bold">
+                Déjà : {item.dejaDepense.toLocaleString()} F
+              </p>
+            </div>
+          </div>
+
+          {/* RIGHT */}
+          <p className={`text-sm font-black w-40 text-right ${
+            item.restant === 0 ? "text-red-500" : "text-green-600"
+          }`}>
+            {item.restant.toLocaleString()} F
+          </p>
+        </div>
+      ))}
+    </div>
+  </div>
+);
   return (
     <div className="space-y-6 pb-20">
         {/* Sélection du mois */}
@@ -202,7 +230,6 @@ export default function Repartition() {
         {renderTable("Cotisation (30%)", cotisation)}
         {renderTable("Restockage (30%)", restockage)}
       </div>
-
       {renderChargesRestantes()}
     </div>
   );
