@@ -94,7 +94,13 @@ export default function Repartition() {
 
   //const fonctionnement = categories.slice(0, 5).map(c => ({ ...c, montant: totalVentes * c.part }));
   const cotisation = categories.slice(5, 6).map(c => ({ ...c, montant: totalVentes * c.part }));
-  const restockage = categories.slice(6).map(c => ({ ...c, montant: totalVentes * c.part + surplus }));
+  const restockageCategories = categories.slice(6);
+  const surplusParCategorie = surplus / restockageCategories.length;
+
+  const restockage = restockageCategories.map(c => ({ 
+    ...c, 
+    montant: (totalVentes * c.part) + surplusParCategorie
+  }));
 
   const chargesRestantes = (() => {
 
@@ -123,8 +129,11 @@ export default function Repartition() {
     }
 
     // 🟢 CAS 2 : restockage → reçoit le surplus
-    if (["Achat peluche", "Achat coton", "Transport"].includes(c.name)) {
-      montantAutorise += surplusCalcule;
+    const restockageNames = ["Achat peluche", "Achat coton", "Transport"];
+    const surplusParCategorie = surplusCalcule / restockageNames.length;
+
+    if (restockageNames.includes(c.name)) {
+      montantAutorise += surplusParCategorie;
     }
 
     return {

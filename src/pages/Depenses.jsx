@@ -117,8 +117,11 @@ if (plafonds[depenseType] !== undefined) {
 
 // 👉 restockage → + surplus
 // 👉 restockage → + surplus TOTAL (comme Repartition)
-if (["Achat peluche", "Achat coton", "Transport"].includes(depenseType)) {
-  limite += surplus;
+const restockageTypes = ["Achat peluche", "Achat coton", "Transport"];
+const surplusParCategorie = surplus / restockageTypes.length;
+
+if (restockageTypes.includes(depenseType)) {
+  limite += surplusParCategorie;
 }
   // 3️⃣ Calcul des dépenses déjà faites ce mois pour ce type
   const dejaDepense = depenses
