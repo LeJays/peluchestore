@@ -6,6 +6,7 @@ import { collection, onSnapshot, doc, updateDoc, setDoc } from "firebase/firesto
 export default function Finance() {
   const [commandes, setCommandes] = useState([]);
   const [depenses, setDepenses] = useState([]);
+  const [depensesReliquat, setDepensesReliquat] = useState([]);
   const [peluches, setPeluches] = useState([]); // Pour la valeur du stock
   const [capital, setCapital] = useState(0);
   const [isEditingCapital, setIsEditingCapital] = useState(false);
@@ -55,12 +56,16 @@ export default function Finance() {
       setDepenses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
+    const unsubDepensesReliquat = onSnapshot(collection(db, "depenses_reliquat"), (snap) => {
+      setDepensesReliquat(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     const unsubPeluches = onSnapshot(collection(db, "peluches"), (snap) => {
       setPeluches(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
 
-    return () => { unsubCapital(); unsubCommandes(); unsubDepenses(); unsubPeluches(); };
+    return () => { unsubCapital(); unsubCommandes(); unsubDepenses(); unsubDepensesReliquat(); unsubPeluches(); };
   }, []);
 
   const handleUpdateCapital = async () => {
@@ -89,7 +94,9 @@ export default function Finance() {
     return acc;
   }, 0);
 
-  const totalDepenses = depenses.reduce((acc, curr) => acc + (Number(curr.montant) || 0), 0);
+  const sommeDepensesNormales = depenses.reduce((acc, curr) => acc + (Number(curr.montant) || 0), 0);
+  const sommeDepensesReliquat = depensesReliquat.reduce((acc, curr) => acc + (Number(curr.montant) || 0), 0);
+  const totalDepenses = sommeDepensesNormales + sommeDepensesReliquat;
   
   // NOUVEAUX CALCULS
   const totalEnCaisse = totalVentes + capital - totalDepenses;
