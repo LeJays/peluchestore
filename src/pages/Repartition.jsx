@@ -117,8 +117,9 @@ export default function Repartition() {
   });
 
   return categories.map(c => {
+    // IMPORTANT: On ne compte que les dépenses normales, pas celles sur reliquat
     const dejaDepense = depenses
-      .filter(d => d.type === c.name)
+      .filter(d => d.type === c.name && !d.isReliquat)
       .reduce((acc, d) => acc + Number(d.montant || 0), 0);
 
     let montantAutorise = totalVentes * c.part;
