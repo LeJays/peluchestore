@@ -1,20 +1,23 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { db, auth } from '../firebase/config';
-import { collection, onSnapshot, addDoc, doc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { PlusCircle, History, Wallet, TrendingDown } from 'lucide-react';
+import { PlusCircle, History, Wallet, TrendingDown, Pencil, Check, X, Trash2 } from 'lucide-react';
 
 export default function SuiviDepenses() {
   const currentMonth = new Date().toISOString().slice(0,7);
   const [moisSelectionne, setMoisSelectionne] = useState(currentMonth);
   const [allDepenses, setAllDepenses] = useState([]);
+  const [allDepensesReliquat, setAllDepensesReliquat] = useState([]);
   const [allCommandes, setAllCommandes] = useState([]);
   const [nomUtilisateur, setNomUtilisateur] = useState('Admin');
   const [loading, setLoading] = useState(true);
   
   // Formulaire pour dépense sur reliquat
   const [formReliquat, setFormReliquat] = useState({ mois: '', type: '', montant: '' });
+  const [editIdReliquat, setEditIdReliquat] = useState(null);
+  const [editFormReliquat, setEditFormReliquat] = useState({ type: '', montant: '' });
 
   useEffect(() => {
     const getConnectedUserName = async () => {
@@ -33,11 +36,14 @@ export default function SuiviDepenses() {
     const unsubDeps = onSnapshot(collection(db, 'depenses'), snap => {
       setAllDepenses(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
+    const unsubDepsReliquat = onSnapshot(collection(db, 'depenses_reliquat'), snap => {
+      setAllDepensesReliquat(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
     const unsubCmds = onSnapshot(collection(db, 'commandes'), snap => {
       setAllCommandes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     });
-    return () => { unsubDeps(); unsubCmds(); };
+    return () => { unsubDeps(); unsubDepsReliquat(); unsubCmds(); };
   }, []);
 
   // --- LOGIQUE DE CALCUL DU BUDGET (PARTAGÉE AVEC REPARTITION) ---
@@ -105,8 +111,7 @@ export default function SuiviDepenses() {
 
       const dejaDepense = expenses.filter(d => {
         const ts = d.timestamp?.toDate?.();
-        // IMPORTANT: On ne compte que les dépenses normales, pas celles sur reliquat
-        return ts && ts >= debut && ts <= fin && d.type === c.name && !d.isReliquat;
+        return ts && ts >= debut && ts <= fin && d.type === c.name;
       }).reduce((acc, d) => acc + Number(d.montant || 0), 0);
 
       return {
@@ -138,15 +143,15 @@ export default function SuiviDepenses() {
       d.setMonth(d.getMonth() - 1);
     }
 
-    // 2. Soustraire TOUTES les dépenses déjà marquées comme "isReliquat"
-    allDepenses.filter(dep => dep.isReliquat).forEach(dep => {
+    // 2. Soustraire TOUTES les dépenses déjà enregistrées dans la collection dédiée
+    allDepensesReliquat.forEach(dep => {
       if (totals[dep.type] !== undefined) {
         totals[dep.type] -= Number(dep.montant || 0);
       }
     });
 
     return totals;
-  }, [allCommandes, allDepenses]);
+  }, [allCommandes, allDepenses, allDepensesReliquat]);
 
   const historyRestes = useMemo(() => {
     const months = [];
@@ -178,13 +183,12 @@ export default function SuiviDepenses() {
     }
 
     try {
-      await addDoc(collection(db, "depenses"), {
+      await addDoc(collection(db, "depenses_reliquat"), {
         type,
         montant: Number(montant),
         faitPar: nomUtilisateur,
         date: new Date().toLocaleDateString('fr-FR'),
         timestamp: new Date(),
-        isReliquat: true,
         description: "Dépense sur reliquat cumulé"
       });
 
@@ -192,6 +196,35 @@ export default function SuiviDepenses() {
       setFormReliquat({ mois: '', type: '', montant: '' });
     } catch (err) {
       toast(err.message);
+    }
+  };
+
+  const startEditReliquat = (d) => {
+    setEditIdReliquat(d.id);
+    setEditFormReliquat({ type: d.type, montant: d.montant });
+  };
+
+  const saveEditReliquat = async (id) => {
+    try {
+      await updateDoc(doc(db, "depenses_reliquat", id), {
+        type: editFormReliquat.type,
+        montant: Number(editFormReliquat.montant)
+      });
+      setEditIdReliquat(null);
+      toast("Dépense modifiée !");
+    } catch (err) { 
+      toast(err.message); 
+    }
+  };
+
+  const handleDeleteReliquat = async (id) => {
+    if (window.confirm("Êtes-vous sûr de vouloir supprimer cette dépense ? L'argent reviendra à la cagnotte.")) {
+      try {
+        await deleteDoc(doc(db, "depenses_reliquat", id));
+        toast("Dépense supprimée ! L'argent a été remboursé à la cagnotte.");
+      } catch (err) { 
+        toast("Erreur lors de la suppression : " + err.message); 
+      }
     }
   };
 
@@ -315,6 +348,91 @@ export default function SuiviDepenses() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      {/* TABLEAU HISTORIQUE DES DÉPENSES SUR RELIQUAT */}
+      <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100">
+        <div className="flex items-center gap-3 mb-8">
+           <History size={18} className="text-orange-400" />
+           <h3 className="text-xs font-black uppercase text-[#4A3228] tracking-widest">Historique des dépenses sur reliquat</h3>
+        </div>
+        {allDepensesReliquat.length === 0 ? (
+          <p className="text-center text-gray-400 py-8 text-sm">Aucune dépense enregistrée sur reliquat</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase">
+                  <th className="p-5">Date</th>
+                  <th className="p-5">Catégorie</th>
+                  <th className="p-5">Montant</th>
+                  <th className="p-5">Effectué par</th>
+                  <th className="p-5">Description</th>
+                  <th className="p-5 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {[...allDepensesReliquat].sort((a, b) => {
+                  const tsA = a.timestamp?.toDate?.() || new Date(a.date);
+                  const tsB = b.timestamp?.toDate?.() || new Date(b.date);
+                  return tsB - tsA;
+                }).map((dep) => (
+                  <tr key={dep.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="p-5 font-bold text-gray-500 text-xs">{dep.date}</td>
+                    <td className="p-5 font-black text-[#4A3228] uppercase text-xs">
+                      {editIdReliquat === dep.id ? (
+                        <select value={editFormReliquat.type} onChange={e => setEditFormReliquat({...editFormReliquat, type: e.target.value})} className="p-2 border-2 border-orange-400 rounded-xl bg-white text-xs font-bold uppercase">
+                          <option value="">-- Choisir --</option>
+                          <option value="Loyer">Loyer</option>
+                          <option value="Connexion">Connexion</option>
+                          <option value="Salaire">Salaire</option>
+                          <option value="Électricité">Électricité</option>
+                          <option value="Autre">Autre</option>
+                          <option value="Cotisation">Cotisation</option>
+                          <option value="Achat peluche">Achat peluche</option>
+                          <option value="Achat coton">Achat coton</option>
+                          <option value="Transport">Transport</option>
+                        </select>
+                      ) : (
+                        dep.type
+                      )}
+                    </td>
+                    <td className="p-5 font-bold text-orange-500">
+                      {editIdReliquat === dep.id ? (
+                        <input type="number" value={editFormReliquat.montant} onChange={e => setEditFormReliquat({...editFormReliquat, montant: e.target.value})} className="p-2 border-2 border-orange-400 rounded-xl bg-white w-24 text-right text-xs font-bold" />
+                      ) : (
+                        Number(dep.montant || 0).toLocaleString() + ' F'
+                      )}
+                    </td>
+                    <td className="p-5 text-gray-500 text-sm">{dep.faitPar || 'Admin'}</td>
+                    <td className="p-5 text-gray-400 text-sm">{dep.description || '-'}</td>
+                    <td className="p-5 text-center">
+                      {editIdReliquat === dep.id ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => saveEditReliquat(dep.id)} className="p-2 bg-green-100 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all">
+                            <Check size={16} />
+                          </button>
+                          <button onClick={() => setEditIdReliquat(null)} className="p-2 bg-red-100 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all">
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => startEditReliquat(dep)} className="p-2 bg-gray-50 text-gray-400 rounded-xl hover:bg-orange-400 hover:text-white transition-all shadow-sm">
+                            <Pencil size={16} />
+                          </button>
+                          <button onClick={() => handleDeleteReliquat(dep.id)} className="p-2 bg-gray-50 text-red-400 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

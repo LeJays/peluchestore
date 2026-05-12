@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { db, auth } from '../firebase/config';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, getDoc, updateDoc, getDocs } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, getDoc, updateDoc, getDocs, deleteDoc } from "firebase/firestore";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts';
 // IMPORT DES ICÔNES LUCIDE
-import { Pencil, Check, X, Wallet, TrendingDown, Calendar, User, PlusCircle } from 'lucide-react';
+import { Pencil, Check, X, Wallet, TrendingDown, Calendar, User, PlusCircle, Trash2 } from 'lucide-react';
 
 export default function Depenses() {
   const [depenses, setDepenses] = useState([]);
@@ -173,6 +173,17 @@ if (restockageTypes.includes(depenseType)) {
     } catch (err) { toast(err.message); }
   };
 
+  const handleDelete = async (id) => {
+    if (window.confirm("Êtes-vous sûr de vouloir supprimer cette dépense ?")) {
+      try {
+        await deleteDoc(doc(db, "depenses", id));
+        toast("Dépense supprimée !");
+      } catch (err) { 
+        toast("Erreur lors de la suppression : " + err.message); 
+      }
+    }
+  };
+
   // Logique Graphes (Inchangée)
   const dataType = typesDepense.map(t => ({
     name: t.toUpperCase(),
@@ -288,9 +299,14 @@ if (restockageTypes.includes(depenseType)) {
                           </button>
                         </div>
                       ) : (
-                        <button onClick={() => startEdit(d)} className="p-2 bg-gray-50 text-gray-400 rounded-xl hover:bg-[#4A3228] hover:text-white transition-all shadow-sm">
-                          <Pencil size={16} />
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => startEdit(d)} className="p-2 bg-gray-50 text-gray-400 rounded-xl hover:bg-[#4A3228] hover:text-white transition-all shadow-sm">
+                            <Pencil size={16} />
+                          </button>
+                          <button onClick={() => handleDelete(d.id)} className="p-2 bg-gray-50 text-red-400 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

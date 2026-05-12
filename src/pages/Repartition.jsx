@@ -117,9 +117,17 @@ export default function Repartition() {
   });
 
   return categories.map(c => {
-    // IMPORTANT: On ne compte que les dépenses normales, pas celles sur reliquat
+    // On compte uniquement les dépenses normales (les reliquats sont dans une collection séparée)
+    // Pour "Autre", on utilise typeOriginal ou type (sensible à la casse)
     const dejaDepense = depenses
-      .filter(d => d.type === c.name && !d.isReliquat)
+      .filter(d => {
+        if (c.name === "Autre") {
+          // Pour Autre, on compare typeOriginal (qui contient "autre" en minuscules) ou type exactement "Autre"
+          const typeOrig = (d.typeOriginal || d.type || "").toLowerCase();
+          return typeOrig === "autre" || d.type === "Autre";
+        }
+        return d.type === c.name;
+      })
       .reduce((acc, d) => acc + Number(d.montant || 0), 0);
 
     let montantAutorise = totalVentes * c.part;
