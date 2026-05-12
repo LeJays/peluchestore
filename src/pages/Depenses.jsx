@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { db, auth } from '../firebase/config';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, getDoc, updateDoc, getDocs } from "firebase/firestore";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts';
@@ -69,7 +70,7 @@ export default function Depenses() {
       }
     });
   } catch (err) {
-    alert("Erreur lors du calcul du total des ventes : " + err.message);
+    toast("Erreur lors du calcul du total des ventes : " + err.message);
     return;
   }
 
@@ -135,7 +136,7 @@ if (restockageTypes.includes(depenseType)) {
 
   // 4️⃣ Vérification de la limite
   if(Number(montant) + dejaDepense > limite){
-    alert(`Impossible d'ajouter cette dépense.\nLimite pour ce type ce mois : ${limite.toLocaleString()} F\nDéjà dépensé : ${dejaDepense.toLocaleString()} F`);
+    toast(`Impossible d'ajouter cette dépense.\nLimite pour ce type ce mois : ${limite.toLocaleString()} F\nDéjà dépensé : ${dejaDepense.toLocaleString()} F`);
     return;
   }
 
@@ -153,7 +154,7 @@ if (restockageTypes.includes(depenseType)) {
     setAutreNom(""); 
     setType("Loyer");
   } catch (err) { 
-    alert(err.message); 
+    toast(err.message); 
   }
 };
 
@@ -169,7 +170,7 @@ if (restockageTypes.includes(depenseType)) {
         montant: Number(editForm.montant)
       });
       setEditId(null);
-    } catch (err) { alert(err.message); }
+    } catch (err) { toast(err.message); }
   };
 
   // Logique Graphes (Inchangée)

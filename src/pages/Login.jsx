@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import { auth, db } from '../firebase/config';
 import { signInWithEmailAndPassword, signOut } from "firebase/auth"; // Ajout de signOut
 import { doc, getDoc } from "firebase/firestore";
@@ -38,22 +39,40 @@ export default function Login() {
         else {
           // Rôle inconnu : par sécurité on déconnecte
           await signOut(auth);
-          alert("Votre compte n'a pas de rôle assigné. Contactez l'administrateur.");
+          toast("Votre compte n'a pas de rôle assigné. Contactez l'administrateur.");
         }
       } else {
-        alert("Profil introuvable dans la base de données.");
+        toast("Profil introuvable dans la base de données.");
       }
     } catch (err) {
       // Gestion des erreurs en français pour le staff au Cameroun
       let message = "Erreur de connexion";
       if(err.code === 'auth/wrong-password') message = "Mot de passe incorrect";
       if(err.code === 'auth/user-not-found') message = "Cet email n'existe pas";
-      alert(message);
+      toast(message);
     }
   };
 
   return (
     <div className="min-h-screen bg-[#F9F5F0] flex items-center justify-center p-4">
+      <Toaster 
+        position="top-center" 
+        reverseOrder={false}
+        toastOptions={{
+          duration: 5000,
+          style: {
+            background: '#4A3228',
+            color: '#fff',
+            padding: '24px 35px',
+            borderRadius: '30px',
+            fontSize: '16px',
+            fontWeight: '900',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+            maxWidth: '550px',
+            border: '3px solid #A62626',
+          },
+        }}
+      />
       <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md border-b-8 border-[#A62626]">
         <div className="text-center mb-10">
           <h1 className="text-4xl font-black text-[#4A3228]">Peluche Store</h1>

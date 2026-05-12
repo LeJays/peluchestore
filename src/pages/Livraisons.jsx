@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { db } from '../firebase/config';
 import { 
   collection, onSnapshot, query, where, orderBy, 
@@ -107,10 +108,10 @@ const unsubLivre = onSnapshot(qLivre, (snap) => {
       // 2. Supprimer la commande
       await deleteDoc(doc(db, "commandes", commande.id));
       
-      alert("Commande supprimée et stock rétabli !");
+      toast("Commande supprimée et stock rétabli !");
     } catch (err) {
       console.error(err);
-      alert("Erreur lors de l'annulation : " + err.message);
+      toast("Erreur lors de l'annulation : " + err.message);
     }
   };
 
@@ -122,7 +123,7 @@ const unsubLivre = onSnapshot(qLivre, (snap) => {
       const user = auth.currentUser;
 
       if (!user) {
-        alert("Utilisateur non connecté");
+        toast("Utilisateur non connecté");
         return;
       }
 
@@ -148,7 +149,7 @@ const unsubLivre = onSnapshot(qLivre, (snap) => {
 
       await updateDoc(doc(db, "commandes", commande.id), updates);
     } catch (err) {
-      alert("Erreur : " + err.message);
+      toast("Erreur : " + err.message);
     }
   };
 
@@ -197,7 +198,7 @@ const genererFacture = async (commande) => {
     const infos = await recupererInfosPeluche(commande.pelucheId);
 
     if (!infos) {
-      alert("Infos peluche introuvables");
+      toast("Infos peluche introuvables");
       return;
     }
 
@@ -286,7 +287,7 @@ const genererFacture = async (commande) => {
     win.print();
 
   } catch (err) {
-    alert("Erreur lors de la génération de la facture : " + err.message);
+    toast("Erreur lors de la génération de la facture : " + err.message);
   }
 };
 

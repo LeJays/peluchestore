@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import { auth, db } from '../firebase/config.js';
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
@@ -29,16 +30,31 @@ export default function Register() {
         createdAt: new Date()
       });
 
-      alert("Compte créé ! Un email de vérification a été envoyé à " + formData.email);
+      toast("Compte créé ! Un email de vérification a été envoyé à " + formData.email);
       navigate('/'); // Retour au login
     } catch (err) {
-      alert("Erreur : " + err.message);
+      toast("Erreur : " + err.message);
     }
     setLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-[#F9F5F0] flex items-center justify-center p-4">
+      <Toaster 
+        position="top-center" 
+        toastOptions={{
+          style: {
+            background: '#4A3228',
+            color: '#fff',
+            padding: '20px 30px',
+            borderRadius: '25px',
+            fontSize: '15px',
+            fontWeight: '900',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+            border: '2px solid #F2A7B5'
+          }
+        }}
+      />
       <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl w-full max-w-md border-t-8 border-[#F2A7B5]">
         <div className="text-center mb-8">
           <h2 className="text-2xl font-black text-[#4A3228]">Nouveau Membre Staff</h2>

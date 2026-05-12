@@ -1,11 +1,12 @@
 import React from 'react';
+import toast from 'react-hot-toast';
 import { auth } from '../firebase/config.js';
 import { sendEmailVerification } from "firebase/auth";
 
 export default function VerifyEmail() {
   const resend = () => {
     sendEmailVerification(auth.currentUser);
-    alert("Nouveau lien envoyé ! Vérifie tes spams.");
+    toast("Nouveau lien envoyé ! Vérifie tes spams.");
   };
 
   return (

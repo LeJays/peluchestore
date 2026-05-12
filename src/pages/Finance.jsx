@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { db } from '../firebase/config';
 import { collection, onSnapshot, doc, updateDoc, setDoc } from "firebase/firestore";
 
@@ -34,7 +35,7 @@ export default function Finance() {
       setMontantManuel("");
       setDescriptionManuelle("");
     } catch (err) {
-      alert(err.message);
+      toast(err.message);
     }
   };
 
@@ -66,7 +67,7 @@ export default function Finance() {
     try {
       await setDoc(doc(db, "settings", "finance"), { capital: Number(nouveauCapital) }, { merge: true });
       setIsEditingCapital(false);
-    } catch (err) { alert(err.message); }
+    } catch (err) { toast(err.message); }
   };
 
   // --- CALCULS ---

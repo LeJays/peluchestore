@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import { auth, db } from '../firebase/config'; 
 import { onAuthStateChanged, signOut } from "firebase/auth"; 
 import { doc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore"; 
@@ -56,10 +57,10 @@ export default function AdminDashboard() {
             const deletePromises = querySnapshot.docs.map(document => deleteDoc(doc(db, collName, document.id)));
             await Promise.all(deletePromises);
           }
-          alert("Base de données nettoyée avec succès !");
+          toast("Base de données nettoyée avec succès !");
         } catch (error) {
           console.error("Erreur lors de la suppression:", error);
-          alert("Une erreur est survenue lors de la suppression.");
+          toast("Une erreur est survenue lors de la suppression.");
         }
       }
     }
@@ -84,6 +85,24 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex h-screen w-full bg-[#FDFCFB] overflow-hidden font-['Inter']">
+      <Toaster 
+        position="top-right" 
+        reverseOrder={false}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#1A1C23',
+            color: '#fff',
+            padding: '20px 30px',
+            borderRadius: '24px',
+            fontSize: '15px',
+            fontWeight: '900',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
+            maxWidth: '500px',
+            border: '2px solid #A62626',
+          },
+        }}
+      />
       
       {/* --- MENU MOBILE --- */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-[60] bg-[#1A1C23] p-4 flex justify-between items-center text-white">

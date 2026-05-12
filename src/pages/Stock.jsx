@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { Pencil } from "lucide-react";
 import { db, auth } from '../firebase/config';
 import { collection, getDocs, addDoc, updateDoc, doc, increment, query, orderBy, getDoc } from "firebase/firestore";
@@ -93,16 +94,16 @@ export default function Stock() {
         stock: increment(Number(formEntree.quantite))
       });
 
-      alert("Entrée enregistrée !");
+      toast("Entrée enregistrée !");
       setFormEntree({ pelucheId: '', quantite: '' });
       fetchData();
-    } catch (err) { alert(err.message); }
+    } catch (err) { toast(err.message); }
   };
 
   const handleSortie = async (e) => {
     e.preventDefault();
     const p = peluches.find(item => item.id === formSortie.pelucheId);
-    if (!p || p.stock < formSortie.quantite) return alert("Stock insuffisant !");
+    if (!p || p.stock < formSortie.quantite) return toast("Stock insuffisant !");
 
     const nomArticle = `${p.taille} ${p.couleur} ${p.categorie}`;
 
@@ -128,10 +129,10 @@ export default function Stock() {
         stock: increment(-Number(formSortie.quantite))
       });
 
-      alert("Sortie validée ! L'article est retiré du stock.");
+      toast("Sortie validée ! L'article est retiré du stock.");
       setFormSortie({ client: '', tel: '', pelucheId: '', quantite: 1, lieu: '', paiement: 'Orange Money', statut: 'payé', prixTotal: 0 });
       fetchData();
-    } catch (err) { alert(err.message); }
+    } catch (err) { toast(err.message); }
   };
 
   const modifierStockDirect = async (id, nouvelleValeur) => {
@@ -140,7 +141,7 @@ export default function Stock() {
     try {
       await updateDoc(doc(db, "peluches", id), { stock: valeur });
       fetchData();
-    } catch (err) { alert("Erreur : " + err.message); }
+    } catch (err) { toast("Erreur : " + err.message); }
   };
 
   const peluchesTriees = [...peluches].sort((a, b) => {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
 import { auth, db } from '../firebase/config';
 import { 
   collection, onSnapshot, query, where, doc, updateDoc, 
@@ -62,7 +63,7 @@ export default function LivreurDashboard() {
       try {
         await signOut(auth);
       } catch (error) {
-        alert("Erreur lors de la déconnexion");
+        toast("Erreur lors de la déconnexion");
       }
     }
   };
@@ -83,7 +84,7 @@ export default function LivreurDashboard() {
         }
       }
       await deleteDoc(doc(db, "commandes", commande.id));
-    } catch (err) { alert("Erreur : " + err.message); }
+    } catch (err) { toast("Erreur : " + err.message); }
   };
 
   const modifierStatut = async (id, nouveauStatut) => {
@@ -93,7 +94,7 @@ export default function LivreurDashboard() {
         livreur_nom: userProfile.name,
         derniere_maj: serverTimestamp()
       });
-    } catch (e) { alert("Erreur réseau"); }
+    } catch (e) { toast("Erreur réseau"); }
   };
 
   const finaliserLivraison = async (modePaiement) => {
@@ -108,11 +109,28 @@ export default function LivreurDashboard() {
         date_livraison_reelle: serverTimestamp()
       });
       setShowPaymentModal(null);
-    } catch (e) { alert("Erreur validation"); }
+    } catch (e) { toast("Erreur validation"); }
   };
 
   return (
     <div className="min-h-screen bg-[#FDFCFB] font-['Inter'] pb-24">
+      <Toaster 
+        position="bottom-center" 
+        reverseOrder={false}
+        toastOptions={{
+          style: {
+            background: '#1A1C23',
+            color: '#fff',
+            padding: '18px 25px',
+            borderRadius: '25px',
+            fontSize: '14px',
+            fontWeight: '900',
+            boxShadow: '0 -10px 25px rgba(0, 0, 0, 0.2)',
+            marginBottom: '40px',
+            border: '2px solid #FF6600',
+          },
+        }}
+      />
       <header className="bg-[#1A1C23] text-white p-6 rounded-b-[2.5rem] shadow-xl sticky top-0 z-40">
         <div className="flex justify-between items-center mb-6">
           <div>
