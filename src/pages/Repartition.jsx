@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import toast from 'react-hot-toast';
 import { db, auth } from "../firebase/config";
-import { collection, onSnapshot, addDoc, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { PLAFONDS, CATEGORIES, calculateRestesCumules } from "../utils/repartitionBudget";
 
 const COLORS = ["#4A3228", "#A62626", "#D97706", "#059669", "#2563EB", "#7C3AED"];
 
@@ -81,30 +82,9 @@ export default function Repartition() {
     getConnectedUserName();
   }, []);
 
-  const plafonds = {
-    "Loyer": 50000,
-    "Connexion": 20000,
-    "Salaire": 100000,
-    "Électricité": 15000,
-    "Autre": 30000
-  };
-
+  const plafonds = PLAFONDS;
   let surplus = 0;
-
-
-
-  // Définition des catégories
-  const categories = [
-    { name: "Loyer", part: 0.4 * 0.3 },
-    { name: "Connexion", part: 0.4 * 0.1 },
-    { name: "Salaire", part: 0.4 * 0.3 },
-    { name: "Électricité", part: 0.4 * 0.15 },
-    { name: "Autre", part: 0.4 * 0.15 },
-    { name: "Cotisation", part: 0.3 },
-    { name: "Achat peluche", part: 0.3 * 0.4 },
-    { name: "Achat coton", part: 0.3 * 0.2 },
-    { name: "Transport", part: 0.3 * 0.4 },
-  ];
+  const categories = CATEGORIES;
 
   const fonctionnement = categories.slice(0, 5).map(c => {
     const montantBrut = totalVentes * c.part;
@@ -131,123 +111,15 @@ export default function Repartition() {
     montant: (totalVentes * c.part) + surplusParCategorie
   }));
 
-  // --- LOGIQUE PARTAGÉE POUR RÉPARTITION MENSUELLE ET RELIQUAT ---
-  const calculateBudgetForMonth = (monthStr, commands, expenses) => {
-    const [year, month] = monthStr.split("-").map(Number);
-    const debut = new Date(year, month - 1, 1);
-    const fin = new Date(year, month, 0, 23, 59, 59);
-
-    const sales = commands.filter(c => {
-      let d = null;
-      if (c.timestamp?.toDate) d = c.timestamp.toDate();
-      else if (c.dateJS?.seconds) d = new Date(c.dateJS.seconds * 1000);
-      else if (c.timestamp instanceof Date) d = c.timestamp;
-      return d && d >= debut && d <= fin;
-    }).reduce((acc, v) => {
-      let montant = 0;
-      if ((v.statut === "payé" && v.statut_paiement === "TOTALEMENT_PAYÉ") || v.statut_paiement === "ATTENTE_LIVRAISON") {
-        montant = Number(v.prixTotal) || 0;
-      } else if (v.statut === "prépayé") {
-        montant = Number(v.montantRembourse) || 0;
-      }
-      return acc + montant;
-    }, 0);
-
-    const categoriesDef = [
-      { name: "Loyer", part: 0.4 * 0.3 },
-      { name: "Connexion", part: 0.4 * 0.1 },
-      { name: "Salaire", part: 0.4 * 0.3 },
-      { name: "Électricité", part: 0.4 * 0.15 },
-      { name: "Autre", part: 0.4 * 0.15 },
-      { name: "Cotisation", part: 0.3 },
-      { name: "Achat peluche", part: 0.3 * 0.4 },
-      { name: "Achat coton", part: 0.3 * 0.2 },
-      { name: "Transport", part: 0.3 * 0.4 },
-    ];
-
-    const plafondsLocal = {
-      "Loyer": 50000,
-      "Connexion": 20000,
-      "Salaire": 100000,
-      "Électricité": 15000,
-      "Autre": 30000
-    };
-
-    let surplusLocal = 0;
-    categoriesDef.slice(0, 5).forEach(c => {
-      const montantBrut = sales * c.part;
-      const plafond = plafondsLocal[c.name];
-      if (montantBrut > plafond) surplusLocal += (montantBrut - plafond);
-    });
-
-    const restockageNames = ["Achat peluche", "Achat coton", "Transport"];
-    const surplusParCategorieLocal = surplusLocal / restockageNames.length;
-
-    return categoriesDef.map(c => {
-      let montantAutorise = sales * c.part;
-      if (plafondsLocal[c.name] !== undefined) {
-        montantAutorise = Math.min(montantAutorise, plafondsLocal[c.name]);
-      }
-      if (restockageNames.includes(c.name)) montantAutorise += surplusParCategorieLocal;
-
-      const dejaDepense = expenses.filter(d => {
-        const ts = d.timestamp?.toDate?.();
-        return ts && ts >= debut && ts <= fin && d.type === c.name;
-      }).reduce((acc, d) => acc + Number(d.montant || 0), 0);
-
-      return {
-        name: c.name,
-        montantAutorise,
-        dejaDepense,
-        reste: Math.max(montantAutorise - dejaDepense, 0)
-      };
-    });
-  };
-
-  const aggregatedRestes = useMemo(() => {
-    const totals = {};
-    const categoriesList = ["Loyer","Connexion","Salaire","Électricité","Autre","Cotisation","Achat peluche","Achat coton","Transport"];
-    categoriesList.forEach(cat => totals[cat] = 0);
-
-    let d = new Date(moisSelectionne + '-01');
-    for (let i = 0; i < 12; i++) {
-      const mStr = d.toISOString().slice(0, 7);
-      const budget = calculateBudgetForMonth(mStr, allCommandes, allDepenses);
-      budget.forEach(b => { totals[b.name] += b.reste; });
-      d.setMonth(d.getMonth() - 1);
-    }
-
-    allDepensesReliquat.forEach(dep => {
-      if (totals[dep.type] !== undefined) totals[dep.type] -= Number(dep.montant || 0);
-    });
-
-    return totals;
-  }, [moisSelectionne, allCommandes, allDepenses, allDepensesReliquat]);
-
-  // Somme cumulée des montants autorisés (pour affichage 'montant autorisé' en cumul)
-  const aggregatedMontantsAutorises = useMemo(() => {
-    const totals = {};
-    const categoriesList = ["Loyer","Connexion","Salaire","Électricité","Autre","Cotisation","Achat peluche","Achat coton","Transport"];
-    categoriesList.forEach(cat => totals[cat] = 0);
-
-    // inclure mois sélectionné + 11 mois précédents
-    for (let i = 0; i <= 11; i++) {
-      const tmp = new Date();
-      tmp.setMonth(tmp.getMonth() - i + (new Date().getMonth() - new Date(moisSelectionne + '-01').getMonth()));
-      // Instead of complex relative, compute month strings by iterating from selected month
-    }
-
-    // Simpler: iterate from selected month backwards 11 months
-    let d = new Date(moisSelectionne + '-01');
-    for (let i = 0; i < 12; i++) {
-      const mStr = d.toISOString().slice(0,7);
-      const budget = calculateBudgetForMonth(mStr, allCommandes, allDepenses);
-      budget.forEach(b => { totals[b.name] += b.montantAutorise; });
-      d.setMonth(d.getMonth() - 1);
-    }
-
-    return totals;
-  }, [moisSelectionne, allCommandes, allDepenses]);
+  const aggregatedRestes = useMemo(
+    () => calculateRestesCumules({
+      commands: allCommandes,
+      expenses: allDepenses,
+      reliquat: allDepensesReliquat,
+      endMonthStr: moisSelectionne,
+    }),
+    [moisSelectionne, allCommandes, allDepenses, allDepensesReliquat]
+  );
 
   const renderTable = (title, data) => (
     <div className="bg-white p-6 rounded-[3rem] border border-gray-100 shadow-sm mb-8">
@@ -341,7 +213,7 @@ export default function Repartition() {
         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Recette du mois</p>
         <h2 className="text-3xl font-black text-[#4A3228] mt-2">{totalVentes.toLocaleString()} F</h2>
       </div>
-       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Charges restantes (cumul 12 mois)</p>
+       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Charges restantes (cumul global)</p>
 
       {renderChargesRestantes()}
       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Répartition des charges</p>
@@ -359,7 +231,7 @@ export default function Repartition() {
               <div key={cat} className="bg-gray-50 p-4 rounded-2xl flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-black text-[#4A3228] uppercase">{cat}</p>
-                  <p className="text-sm text-gray-500">Cumul 12 mois</p>
+                  <p className="text-sm text-gray-500">Cumul global</p>
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-black text-green-600">{val.toLocaleString()} F</p>

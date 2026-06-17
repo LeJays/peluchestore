@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { db, auth } from '../firebase/config';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, getDoc, updateDoc, getDocs, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { calculateRestesCumules, getLimitCategoryForExpense } from '../utils/repartitionBudget';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts';
 // IMPORT DES ICÔNES LUCIDE
 import { Pencil, Check, X, Wallet, TrendingDown, Calendar, User, PlusCircle, Trash2 } from 'lucide-react';
@@ -21,15 +22,6 @@ export default function Depenses() {
 
   const typesDepense = ["Loyer", "Connexion", "Salaire", "Achat coton", "Transport", "Achat peluche", "Cotisation", "Électricité", "Autre"];
   const COLORS = ['#4A3228', '#A62626', '#10B981', '#F59E0B', '#3B82F6', '#EC4899', '#6B7280', '#06B6D4', '#D1D5DB'];
-
-  // 🔥 PLAFONDS (partagés)
-  const plafonds = {
-    "Loyer": 50000,
-    "Connexion": 20000,
-    "Salaire": 100000,
-    "Électricité": 15000,
-    "Autre": 30000
-  };
 
   useEffect(() => {
     fetchDepenses();
@@ -62,174 +54,28 @@ export default function Depenses() {
     });
   };
 
-  // --- Calcul partagé (hors handler) : budget par mois et agrégation des restes ---
-  const calculateBudgetForMonth = (monthStr, commands, expenses) => {
-    const [year, month] = monthStr.split('-').map(Number);
-    const debut = new Date(year, month - 1, 1);
-    const fin = new Date(year, month, 0, 23, 59, 59);
+  const currentMonth = new Date().toISOString().slice(0, 7);
 
-    const sales = commands.filter(c => {
-      let d = null;
-      if (c.timestamp?.toDate) d = c.timestamp.toDate();
-      else if (c.dateJS?.seconds) d = new Date(c.dateJS.seconds * 1000);
-      else if (c.timestamp instanceof Date) d = c.timestamp;
-      return d && d >= debut && d <= fin;
-    }).reduce((acc, v) => {
-      let montant = 0;
-      if ((v.statut === "payé" && v.statut_paiement === "TOTALEMENT_PAYÉ") || v.statut_paiement === "ATTENTE_LIVRAISON") {
-        montant = Number(v.prixTotal) || 0;
-      } else if (v.statut === "prépayé") {
-        montant = Number(v.montantRembourse) || 0;
-      }
-      return acc + montant;
-    }, 0);
-
-    const categoriesDef = [
-      { name: "Loyer", part: 0.4 * 0.3 },
-      { name: "Connexion", part: 0.4 * 0.1 },
-      { name: "Salaire", part: 0.4 * 0.3 },
-      { name: "Électricité", part: 0.4 * 0.15 },
-      { name: "Autre", part: 0.4 * 0.15 },
-      { name: "Cotisation", part: 0.3 },
-      { name: "Achat peluche", part: 0.3 * 0.4 },
-      { name: "Achat coton", part: 0.3 * 0.2 },
-      { name: "Transport", part: 0.3 * 0.4 },
-    ];
-
-    const plafondsLocal = plafonds;
-
-    let surplusLocal = 0;
-    categoriesDef.slice(0,5).forEach(c => {
-      const montantBrut = sales * c.part;
-      const plafond = plafondsLocal[c.name] || montantBrut;
-      if (montantBrut > plafond) surplusLocal += (montantBrut - plafond);
-    });
-
-    const restockageNames = ["Achat peluche","Achat coton","Transport"];
-    const surplusParCategorieLocal = surplusLocal / restockageNames.length;
-
-    return categoriesDef.map(c => {
-      let montantAutorise = sales * c.part;
-      if (plafondsLocal[c.name] !== undefined) montantAutorise = Math.min(montantAutorise, plafondsLocal[c.name]);
-      if (restockageNames.includes(c.name)) montantAutorise += surplusParCategorieLocal;
-
-      const dejaDepense = expenses.filter(d => {
-        const ts = d.timestamp?.toDate?.();
-        return ts && ts >= debut && ts <= fin && d.type === c.name;
-      }).reduce((acc, d) => acc + Number(d.montant || 0), 0);
-
-      return { name: c.name, montantAutorise, dejaDepense, reste: Math.max(montantAutorise - dejaDepense, 0) };
-    });
-  };
-
-  const aggregatedRestes = useMemo(() => {
-    const totals = {};
-    const categoriesList = ["Loyer","Connexion","Salaire","Électricité","Autre","Cotisation","Achat peluche","Achat coton","Transport"];
-    categoriesList.forEach(cat => totals[cat] = 0);
-
-    // reste du mois courant
-    const now = new Date();
-    const thisMonthStr = now.toISOString().slice(0,7);
-    const thisBudget = calculateBudgetForMonth(thisMonthStr, allCommandes, depenses);
-    thisBudget.forEach(b => { totals[b.name] += b.reste; });
-
-    // ajouter 11 mois précédents
-    for (let i = 1; i <= 11; i++) {
-      const tmp = new Date(); tmp.setMonth(tmp.getMonth() - i);
-      const mStr = tmp.toISOString().slice(0,7);
-      const budget = calculateBudgetForMonth(mStr, allCommandes, depenses);
-      budget.forEach(b => { totals[b.name] += b.reste; });
-    }
-
-    // soustraire depenses_reliquat
-    allDepensesReliquat.forEach(dep => { if (totals[dep.type] !== undefined) totals[dep.type] -= Number(dep.montant || 0); });
-
-    return totals;
-  }, [allCommandes, depenses, allDepensesReliquat]);
+  const aggregatedRestes = useMemo(
+    () => calculateRestesCumules({
+      commands: allCommandes,
+      expenses: depenses,
+      reliquat: allDepensesReliquat,
+      endMonthStr: currentMonth,
+    }),
+    [allCommandes, depenses, allDepensesReliquat]
+  );
 
   const handleAjouter = async (e) => {
   e.preventDefault();
   if (!montant) return;
 
-  const depenseType = type === "autre" ? autreNom : type;
+  const depenseType = type === "Autre" ? autreNom : type;
+  const limiteCategory = getLimitCategoryForExpense(type, depenseType);
+  const limiteGlobale = Math.max(aggregatedRestes[limiteCategory] ?? 0, 0);
 
-  // 1️⃣ Calcul du total des ventes du mois à partir de la collection "commandes"
-  const now = new Date();
-  const debutMois = new Date(now.getFullYear(), now.getMonth(), 1);
-  const finMois = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-
-  let totalVentesMois = 0;
-  try {
-    const commandesSnap = await getDocs(collection(db, "commandes"));
-    commandesSnap.forEach(doc => {
-      const data = doc.data();
-      const date = data.timestamp?.toDate?.();
-      if (!date) return;
-      if (date >= debutMois && date <= finMois) {
-        if (data.statut === "payé" && data.statut_paiement === "TOTALEMENT_PAYÉ") {
-          totalVentesMois += Number(data.prixTotal) || 0;
-        } else if (data.statut === "prépayé") {
-          totalVentesMois += Number(data.montantRembourse) || 0;
-        }
-      }
-    });
-  } catch (err) {
-    toast("Erreur lors du calcul du total des ventes : " + err.message);
-    return;
-  }
-
-  // 🔥 POURCENTAGES
-const repartition = {
-  "Loyer": 0.4*0.3,
-  "Connexion": 0.4*0.1,
-  "Salaire": 0.4*0.3,
-  "Électricité": 0.4*0.15,
-  "Autre": 0.4*0.15,
-  "Cotisation": 0.3,
-  "Achat peluche": 0.3*0.4,
-  "Achat coton": 0.3*0.2,
-  "Transport": 0.3*0.4
-};
-
-// 🔥 1️⃣ CALCUL SURPLUS (comme Repartition)
-let surplus = 0;
-
-Object.keys(plafonds).forEach(type => {
-  const montantBrut = totalVentesMois * (repartition[type] || 0);
-  const plafond = plafonds[type];
-
-  if (montantBrut > plafond) {
-    surplus += (montantBrut - plafond);
-  }
-});
-
-// 🔥 2️⃣ CALCUL LIMITE RÉELLE
-let limite = totalVentesMois * (repartition[depenseType] || 1);
-
-// 👉 fonctionnement → plafond
-if (plafonds[depenseType] !== undefined) {
-  limite = Math.min(limite, plafonds[depenseType]);
-}
-
-// 👉 restockage → + surplus
-// 👉 restockage → + surplus TOTAL (comme Repartition)
-const restockageTypes = ["Achat peluche", "Achat coton", "Transport"];
-const surplusParCategorie = surplus / restockageTypes.length;
-
-if (restockageTypes.includes(depenseType)) {
-  limite += surplusParCategorie;
-}
-
-// note: aggregatedRestes is defined at component scope; reuse it here instead of redefining hooks inside handlers
-  // 3️⃣ Calcul des dépenses déjà faites (globalement) pour ce type
-  const dejaDepenseGlobal = depenses
-    .filter(d => d.type === depenseType)
-    .reduce((acc,curr)=> acc + (Number(curr.montant)||0), 0);
-
-  // 4️⃣ Vérification de la limite en utilisant la répartition globale
-  const limiteGlobale = aggregatedRestes[depenseType] !== undefined ? aggregatedRestes[depenseType] : limite;
-  if (Number(montant) + dejaDepenseGlobal > limiteGlobale) {
-    toast(`Impossible d'ajouter cette dépense.\nLimite globale pour ce type : ${limiteGlobale.toLocaleString()} F\nDéjà dépensé : ${dejaDepenseGlobal.toLocaleString()} F`);
+  if (Number(montant) > limiteGlobale) {
+    toast(`Impossible d'ajouter cette dépense.\nReste cumulé global (${limiteCategory}) : ${limiteGlobale.toLocaleString()} F`);
     return;
   }
 
