@@ -4,8 +4,10 @@ import { Pencil } from "lucide-react";
 import { db, auth } from '../firebase/config';
 import { collection, getDocs, addDoc, updateDoc, doc, increment, query, orderBy, getDoc } from "firebase/firestore";
 
-export default function Stock() {
-  const [sousOnglet, setSousOnglet] = useState('etat'); 
+export default function Stock({ profil = 'admin' }) {
+  // Mode "secretaire" : uniquement les SORTIES (pas d'entrées, pas de modification directe du stock)
+  const estSecretaire = profil === 'secretaire';
+  const [sousOnglet, setSousOnglet] = useState(profil === 'secretaire' ? 'sortie' : 'etat'); 
   const [peluches, setPeluches] = useState([]);
   const [entrees, setEntrees] = useState([]);
   const [sorties, setSorties] = useState([]); // Pour l'historique des sorties
@@ -50,7 +52,8 @@ export default function Stock() {
       const snap = await getDoc(userRef);
 
       if (snap.exists()) {
-        setNomUtilisateur(snap.data().nom);
+        const data = snap.data();
+        setNomUtilisateur(data.nom || data.name || user.email.split('@')[0]);
       } else {
         // secours
         setNomUtilisateur(user.displayName || user.email.split('@')[0]);
@@ -171,7 +174,9 @@ export default function Stock() {
       
       {/* NAVIGATION SOUS-ONGLETS */}
       <div className="flex gap-2 bg-white p-2 rounded-3xl shadow-sm border w-fit">
-        <button onClick={() => setSousOnglet('entree')} className={`px-6 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${sousOnglet === 'entree' ? 'bg-[#A62626] text-white' : 'text-gray-400'}`}>📦 Entrées</button>
+        {!estSecretaire && (
+          <button onClick={() => setSousOnglet('entree')} className={`px-6 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${sousOnglet === 'entree' ? 'bg-[#A62626] text-white' : 'text-gray-400'}`}>📦 Entrées</button>
+        )}
         <button onClick={() => setSousOnglet('sortie')} className={`px-6 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${sousOnglet === 'sortie' ? 'bg-[#A62626] text-white' : 'text-gray-400'}`}>📤 Sorties</button>
         <button onClick={() => setSousOnglet('etat')} className={`px-6 py-3 rounded-2xl font-black text-[10px] uppercase transition-all ${sousOnglet === 'etat' ? 'bg-[#4A3228] text-white' : 'text-gray-400'}`}>📊 État du Stock</button>
       </div>
@@ -220,16 +225,18 @@ export default function Stock() {
                           <span className="text-[9px] font-bold text-gray-400 uppercase mb-2">{p.couleur}</span>
                           <div className="flex items-center gap-2">
                             <div className={`text-sm font-black px-3 py-1 rounded-lg ${p.stock < 5 ? 'bg-red-500 text-white' : 'bg-[#4A3228] text-white'}`}>{p.stock || 0}</div>
-                            <button
-                              onClick={() => {
-                                const nv = prompt(`Nouveau stock ?`, p.stock);
-                                if (nv !== null) modifierStockDirect(p.id, nv);
-                              }}
-                              title="Modifier le stock"
-                              className="w-9 h-9 rounded-xl bg-white border border-gray-300 flex items-center justify-center hover:bg-[#A62626] transition"
-                            >
-                              <Pencil size={16} strokeWidth={2} className="text-[#A62626] hover:text-white" />
-                            </button>
+                            {!estSecretaire && (
+                              <button
+                                onClick={() => {
+                                  const nv = prompt(`Nouveau stock ?`, p.stock);
+                                  if (nv !== null) modifierStockDirect(p.id, nv);
+                                }}
+                                title="Modifier le stock"
+                                className="w-9 h-9 rounded-xl bg-white border border-gray-300 flex items-center justify-center hover:bg-[#A62626] transition"
+                              >
+                                <Pencil size={16} strokeWidth={2} className="text-[#A62626] hover:text-white" />
+                              </button>
+                            )}
                           </div>
                         </div>
                     ))}

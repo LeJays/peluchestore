@@ -9,10 +9,17 @@ import {
   Wallet, ShoppingBag, Package, Truck, AlertCircle, ArrowUpRight, TrendingUp, Box
 } from 'lucide-react';
 
-export default function Dashboard() {
+export default function Dashboard({ mode = 'admin', vendeurFiltre = null }) {
+  // Mode "secretaire" : toutes les statistiques de ventes sont limitées
+  // aux commandes réalisées par la secrétaire connectée (champ `vendeur`).
+  const estSecretaire = mode === 'secretaire';
+
   const [stats, setStats] = useState({
     caJour: 0,
     commandesMois: 0,
+    caMoisPerso: 0,
+    articlesSortis: 0,
+    commandesDisponibles: 0,
     stockTotal: 0,
     alertesStock: 0,
     livraisonsAttente: 0,
@@ -60,6 +67,11 @@ export default function Dashboard() {
         return { ...data, id: d.id, dateJS };
       });
 
+      // --- FILTRAGE SECRÉTAIRE : uniquement les ventes qu'elle a réalisées ---
+      const ventes = (estSecretaire && vendeurFiltre)
+        ? allCommandes.filter(c => String(c.vendeur || "").trim().toLowerCase() === String(vendeurFiltre).trim().toLowerCase())
+        : allCommandes;
+
       onSnapshot(collection(db, "depenses"), (snapDep) => {
         const allDeps = snapDep.docs.map(d => ({
           ...d.data(),
@@ -84,7 +96,7 @@ export default function Dashboard() {
             const m = target.getMonth();
             const y = target.getFullYear();
 
-            const commandesDuMois = allCommandes.filter(c => c.dateJS.getMonth() === m && c.dateJS.getFullYear() === y);
+            const commandesDuMois = ventes.filter(c => c.dateJS.getMonth() === m && c.dateJS.getFullYear() === y);
             
             const ventesReelles = commandesDuMois.reduce((acc, c) => {
               const montant = c.statut === 'payé' ? (Number(c.prixTotal) || 0) : (Number(c.montantRembourse) || 0);
@@ -114,12 +126,12 @@ export default function Dashboard() {
           const modes = ['Orange Money', 'Mobile Money', 'Cash'];
           const repartition = modes.map(m => ({
             name: m,
-            value: allCommandes.filter(c => c.paiement === m).length
+            value: ventes.filter(c => c.paiement === m).length
           })).filter(v => v.value > 0);
 
           // CALCUL TOP CLIENTS
           // Filtrer commandes du mois en cours
-          const commandesMois = allCommandes.filter(c => c.dateJS >= debutMois);
+          const commandesMois = ventes.filter(c => c.dateJS >= debutMois);
           const clientsMap = {};
           const displayNames = {};
 
@@ -151,10 +163,13 @@ export default function Dashboard() {
 
           setStats(prev => ({ 
             ...prev, 
-            caJour: allCommandes.filter(c => c.dateJS >= aujourdhui).reduce((acc, c) => acc + (c.statut === 'payé' ? Number(c.prixTotal || 0) : Number(c.montantRembourse || 0)), 0),
-            commandesMois: allCommandes.filter(c => c.dateJS >= debutMois).length, 
+            caJour: ventes.filter(c => c.dateJS >= aujourdhui).reduce((acc, c) => acc + (c.statut === 'payé' ? Number(c.prixTotal || 0) : Number(c.montantRembourse || 0)), 0),
+            commandesMois: commandesMois.length,
+            caMoisPerso: commandesMois.reduce((acc, c) => acc + (c.statut === 'payé' ? Number(c.prixTotal || 0) : Number(c.montantRembourse || 0)), 0),
+            articlesSortis: commandesMois.reduce((acc, c) => acc + (Number(c.quantite) || 0), 0),
+            commandesDisponibles: allCommandes.filter(c => c.statut_livraison === "EN_ATTENTE" || c.statut_livraison === "EN_COURS").length,
             livraisonsAttente: allCommandes.filter(c => c.statut_livraison === "EN_ATTENTE").length,
-            dernieresVentes: allCommandes.length > 0 ? [...allCommandes].sort((a,b) => b.dateJS - a.dateJS).slice(0, 4) : [],
+            dernieresVentes: ventes.length > 0 ? [...ventes].sort((a,b) => b.dateJS - a.dateJS).slice(0, 4) : [],
             fluxFinancier: fluxData,
             repartitionPaiement: repartition,
             topClients: topClients
@@ -171,21 +186,37 @@ export default function Dashboard() {
         alertesStock: p.filter(item => Number(item.stock) < 5).length 
       }));
     });
-  }, []);
+  }, [estSecretaire, vendeurFiltre]);
+
+  // Mode de paiement le plus utilisé (utile pour la secrétaire)
+  const modeFavori = stats.repartitionPaiement.length > 0
+    ? [...stats.repartitionPaiement].sort((a, b) => b.value - a.value)[0]
+    : null;
 
   return (
     <div className="space-y-8 pb-10">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <QuickCard title="CA AUJOURD'HUI" value={`${stats.caJour.toLocaleString()} F`} subtitle="Argent réel encaissé" icon={<Wallet className="text-green-600" />} color="bg-green-50" />
-        <QuickCard title="VENTES MOIS" value={stats.commandesMois} subtitle="Nombre de ventes" icon={<ShoppingBag className="text-blue-600" />} color="bg-blue-50" />
-        <QuickCard title="STOCK GLOBAL" value={stats.stockTotal} subtitle="Articles en rayon" icon={<Package className="text-amber-600" />} color="bg-amber-50" />
-        <QuickCard title="À LIVRER" value={stats.livraisonsAttente} subtitle="Livraisons en attente" icon={<Truck className="text-indigo-600" />} color="bg-indigo-50" />
+        {estSecretaire ? (
+          <>
+            <QuickCard title="COMMANDES DISPONIBLES" value={stats.commandesDisponibles} subtitle="Colis à livrer" icon={<Truck className="text-amber-600" />} color="bg-amber-50" />
+            <QuickCard title="MES VENTES DU MOIS" value={stats.commandesMois} subtitle="Sorties enregistrées" icon={<ShoppingBag className="text-blue-600" />} color="bg-blue-50" />
+            <QuickCard title="MON CA DU MOIS" value={`${stats.caMoisPerso.toLocaleString()} F`} subtitle="Argent réel encaissé" icon={<Wallet className="text-green-600" />} color="bg-green-50" />
+            <QuickCard title="ARTICLES SORTIS" value={stats.articlesSortis} subtitle="Peluches vendues ce mois" icon={<Package className="text-rose-600" />} color="bg-rose-50" />
+          </>
+        ) : (
+          <>
+            <QuickCard title="CA AUJOURD'HUI" value={`${stats.caJour.toLocaleString()} F`} subtitle="Argent réel encaissé" icon={<Wallet className="text-green-600" />} color="bg-green-50" />
+            <QuickCard title="VENTES MOIS" value={stats.commandesMois} subtitle="Nombre de ventes" icon={<ShoppingBag className="text-blue-600" />} color="bg-blue-50" />
+            <QuickCard title="STOCK GLOBAL" value={stats.stockTotal} subtitle="Articles en rayon" icon={<Package className="text-amber-600" />} color="bg-amber-50" />
+            <QuickCard title="À LIVRER" value={stats.livraisonsAttente} subtitle="Livraisons en attente" icon={<Truck className="text-indigo-600" />} color="bg-indigo-50" />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
           <div className="flex justify-between items-center mb-8">
-            <div><h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Analyse de Flux</h3><p className="text-xl font-black text-[#4A3228]">VENTES VS DÉPENSES</p></div>
+            <div><h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">{estSecretaire ? "Mes Ventes" : "Analyse de Flux"}</h3><p className="text-xl font-black text-[#4A3228]">{estSecretaire ? "MON ACTIVITÉ SUR 6 MOIS" : "VENTES VS DÉPENSES"}</p></div>
             <TrendingUp className="text-green-500" size={30} />
           </div>
           <div className="h-80">
@@ -196,14 +227,25 @@ export default function Dashboard() {
                 <YAxis axisLine={false} tickLine={false} fontSize={10} tickFormatter={(v) => `${v/1000}k`} />
                 <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '20px', border: 'none'}} />
                 <Legend iconType="circle" />
-                <Bar dataKey="entrees" fill="#10B981" radius={[10, 10, 0, 0]} name="Ventes Réelles (F)" barSize={35} />
-                <Bar dataKey="sorties" fill="#EF4444" radius={[10, 10, 0, 0]} name="Dépenses (F)" barSize={35} />
+                <Bar dataKey="entrees" fill="#10B981" radius={[10, 10, 0, 0]} name={estSecretaire ? "Mes Ventes (F)" : "Ventes Réelles (F)"} barSize={35} />
+                {!estSecretaire && (
+                  <Bar dataKey="sorties" fill="#EF4444" radius={[10, 10, 0, 0]} name="Dépenses (F)" barSize={35} />
+                )}
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
         <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
-           <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-6 text-center">Modes de Paiement</h3>
+           <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-4 text-center">{estSecretaire ? "Mon Mode de Paiement Préféré" : "Modes de Paiement"}</h3>
+           {estSecretaire && (
+             modeFavori ? (
+               <p className="text-center text-xs font-black text-[#4A3228] mb-4">
+                 🏆 {modeFavori.name} <span className="text-[9px] text-gray-400 font-bold uppercase">({modeFavori.value} vente{modeFavori.value > 1 ? "s" : ""})</span>
+               </p>
+             ) : (
+               <p className="text-center text-[10px] font-bold text-gray-400 uppercase italic mb-4">Aucune vente enregistrée</p>
+             )
+           )}
            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -221,15 +263,17 @@ export default function Dashboard() {
 
       <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
         <div className="flex justify-between items-center mb-6">
-          <div><h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest italic">Gestion des Stocks</h3><p className="text-xl font-black text-[#4A3228]">UNITÉS ENTRÉES VS SORTIES</p></div>
+          <div><h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest italic">{estSecretaire ? "Mes Sorties" : "Gestion des Stocks"}</h3><p className="text-xl font-black text-[#4A3228]">{estSecretaire ? "ARTICLES SORTIS PAR MOIS" : "UNITÉS ENTRÉES VS SORTIES"}</p></div>
           <Box className="text-amber-500" size={24} />
         </div>
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={stats.fluxFinancier}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" /><XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={12} /><YAxis axisLine={false} tickLine={false} fontSize={10} /><Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '15px'}} /><Legend />
-              <Bar dataKey="uEntrees" fill="#3B82F6" radius={[8, 8, 0, 0]} name="Peluches Entrées" barSize={30} />
-              <Bar dataKey="uSorties" fill="#EC4899" radius={[8, 8, 0, 0]} name="Peluches Sorties" barSize={30} />
+              {!estSecretaire && (
+                <Bar dataKey="uEntrees" fill="#3B82F6" radius={[8, 8, 0, 0]} name="Peluches Entrées" barSize={30} />
+              )}
+              <Bar dataKey="uSorties" fill="#EC4899" radius={[8, 8, 0, 0]} name={estSecretaire ? "Mes Peluches Sorties" : "Peluches Sorties"} barSize={30} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -241,7 +285,7 @@ export default function Dashboard() {
            <p className="text-5xl font-black">{stats.alertesStock}</p>
         </div>
         <div className="lg:col-span-2 bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
-          <h3 className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest">Dernières Activités</h3>
+          <h3 className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest">{estSecretaire ? "Mes dernières sorties" : "Dernières Activités"}</h3>
           <div className="space-y-4">
             {stats.dernieresVentes.map(v => (
               <div key={v.id} className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-transparent hover:border-gray-200 transition-all">
@@ -262,7 +306,7 @@ export default function Dashboard() {
         <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
   
   <h3 className="text-[10px] font-black uppercase text-gray-400 mb-6 tracking-widest">
-    Top 5 Clients
+    {estSecretaire ? "Mes Meilleurs Clients" : "Top 5 Clients"}
   </h3>
 
   <div className="space-y-4">

@@ -32,9 +32,9 @@ export default function Login() {
           // Si c'est un Admin -> Direction le Dashboard complet
           navigate('/admin');
         } 
-        else if (userData.role === 'livreur') {
-          // Si c'est un Livreur -> Direction son espace mobile
-          navigate('/livreur');
+        else if (userData.role === 'secretaire' || userData.role === 'livreur') {
+          // Secrétaire (ou ancien rôle "livreur") -> Espace secrétariat
+          navigate('/secretaire');
         } 
         else {
           // Rôle inconnu : par sécurité on déconnecte

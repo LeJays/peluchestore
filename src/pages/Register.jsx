@@ -6,7 +6,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { useNavigate } from 'react-router-dom';
 
 export default function Register() {
-  const [formData, setFormData] = useState({ nom: '', email: '', tel: '', pass: '', role: 'livreur' });
+  const [formData, setFormData] = useState({ nom: '', email: '', tel: '', pass: '', role: 'secretaire' });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -76,7 +76,7 @@ export default function Register() {
 
           <select className="w-full p-4 bg-gray-50 rounded-2xl outline-none border-2 border-transparent focus:border-[#F2A7B5] font-bold text-[#4A3228]"
             onChange={e => setFormData({...formData, role: e.target.value})}>
-            <option value="livreur">Livreur</option>
+            <option value="secretaire">Secrétaire</option>
             <option value="admin">Administrateur</option>
           </select>
           

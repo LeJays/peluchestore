@@ -8,7 +8,7 @@ import {
 import { getAuth } from "firebase/auth";
 import { Trash2 } from 'lucide-react'; // Pour une icône sympa
 
-export default function Livraisons() {
+export default function Livraisons({ profil = 'admin' }) {
   const [commandesEnAttente, setCommandesEnAttente] = useState([]);
   const [historiqueLivraisons, setHistoriqueLivraisons] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -320,7 +320,7 @@ const historiqueFiltre = historiqueLivraisons.filter((h) => {
       <div className="bg-[#1A1C23] p-8 rounded-[2.5rem] text-white flex justify-between items-center shadow-2xl border-b-4 border-orange-600">
         <div>
           <h2 className="text-3xl font-black uppercase italic tracking-tighter">Logistique & Flux</h2>
-          <p className="text-orange-500 text-[10px] font-bold uppercase tracking-[0.2em]">Suivi des livraisons Cameroun 🇨🇲</p>
+          <p className="text-orange-500 text-[10px] font-bold uppercase tracking-[0.2em]">{profil === 'secretaire' ? 'Suivi des livraisons • Espace Secrétaire' : 'Suivi des livraisons Cameroun 🇨🇲'}</p>
         </div>
         <div className="bg-white/5 border border-white/10 p-4 rounded-3xl text-center min-w-[100px]">
           <span className="block text-2xl font-black text-orange-500">{commandesEnAttente.length}</span>

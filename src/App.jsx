@@ -1,8 +1,8 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
-import LivreurDashboard from './pages/LivreurDashboard.jsx'; // Ton nouveau composant
+import SecretaireDashboard from './pages/SecretaireDashboard.jsx';
 import VerifyEmail from './pages/VerifyEmail.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
@@ -25,15 +25,18 @@ function App() {
           } 
         />
 
-        {/* Page Livreur : Protégée + vérification rôle livreur */}
+        {/* Page Secrétaire : Protégée + vérification rôle secretaire */}
         <Route 
-          path="/livreur" 
+          path="/secretaire" 
           element={
-            <ProtectedRoute roleRequis="livreur">
-              <LivreurDashboard />
+            <ProtectedRoute roleRequis="secretaire">
+              <SecretaireDashboard />
             </ProtectedRoute>
           } 
         />
+
+        {/* Ancienne route Livreur : redirection vers l'espace secrétariat */}
+        <Route path="/livreur" element={<Navigate to="/secretaire" replace />} />
       </Routes>
     </Router>
   );
